@@ -29,23 +29,26 @@ import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
  * When it returns false, the Remix/Sequence rows are only reachable through a long
  * original-media metadata chain, which is why Sequence goes missing on some reels.
  *
- * Method/field names verified against Instagram 444.0.0.46.85.
+ * Method/field names and fingerprint strings verified against Instagram
+ * 435.0.0.37.76 (arm64-v8a) and cross-checked on 444.0.0.46.85.
  */
 private const val REMIX_GATE_METHOD_NAME = "A0H"
 
-// Action sheet builder (3 gate call sites).
+// Action sheet builder. "remix_prefetch" is logged only by the action-sheet
+// path of ClipsOrganicMediaItemViewMoreOptionsController (unique app-wide).
 internal object ClipsShowRemixingOptionsFingerprint : Fingerprint(
     strings =
         listOf(
-            "android_purge_26_q3_ClipsOrganicMediaItemViewMoreOptionsController_shouldShowRemixingOptions",
+            "remix_prefetch",
         ),
 )
 
-// Bottom sheet builder (1 gate call site).
+// Bottom sheet builder. "simplified_overflow_menu" appears only in the
+// reduced-options bottom-sheet path (unique app-wide).
 internal object ClipsMaybeAddRemixRowsFingerprint : Fingerprint(
     strings =
         listOf(
-            "android_purge_26_q3_ClipsOrganicMediaItemViewMoreOptionsController_maybeAddRemixRows",
+            "simplified_overflow_menu",
         ),
 )
 
