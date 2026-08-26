@@ -314,6 +314,15 @@ public class ScreenBuilder {
                     )
             );
         }
+        if (SettingsStatus.shareSheetCopyLink) {
+            addPreference(
+                    helper.switchPreference(
+                            str("piko_share_sheet_copy_link"),
+                            "",
+                            Settings.SHARE_SHEET_COPY_LINK
+                    )
+            );
+        }
     }
 
     public void distractionFreeSection() {
@@ -591,6 +600,15 @@ public class ScreenBuilder {
                             str("piko_hide_reshare_button"),
                             "",
                             Settings.HIDE_RESHARE_BUTTON
+                    )
+            );
+        }
+        if (SettingsStatus.forceSequence) {
+            addPreference(
+                    helper.switchPreference(
+                            str("piko_force_sequence"),
+                            "",
+                            Settings.FORCE_SEQUENCE
                     )
             );
         }

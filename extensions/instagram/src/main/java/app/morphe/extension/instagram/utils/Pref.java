@@ -289,6 +289,14 @@ public class Pref {
         return SharedPref.getBooleanPref(Settings.COPY_MEDIA_LINK) && SettingsStatus.copyMediaLink;
     }
 
+    public static boolean shareSheetCopyLink() {
+        return SharedPref.getBooleanPref(Settings.SHARE_SHEET_COPY_LINK) && SettingsStatus.shareSheetCopyLink;
+    }
+
+    public static boolean forceSequence() {
+        return SharedPref.getBooleanPref(Settings.FORCE_SEQUENCE) && SettingsStatus.forceSequence;
+    }
+
     public static String externalDownloaderPackageName() {
         return SharedPref.getStringPref(Settings.EXTERNAL_DOWNLOADER_PACKAGE_NAME);
     }
