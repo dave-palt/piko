@@ -364,14 +364,14 @@ public class ShareSheetCopyLink {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
 
-        LinearLayout all = makeButton(context, str("piko_copy_all_media_links"), true);
-        all.setOnClickListener(v -> copyNow(fragment, v, true));
-        row.addView(all, new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
         LinearLayout current = makeButton(context, str("piko_copy_current_media_link"), true);
         current.setOnClickListener(v -> copyNow(fragment, v, false));
         row.addView(current, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        LinearLayout all = makeButton(context, str("piko_copy_all_media_links"), true);
+        all.setOnClickListener(v -> copyNow(fragment, v, true));
+        row.addView(all, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         return row;
