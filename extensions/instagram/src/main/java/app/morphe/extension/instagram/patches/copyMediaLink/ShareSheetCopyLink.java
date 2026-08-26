@@ -192,7 +192,7 @@ public class ShareSheetCopyLink {
             index = parent.indexOfChild(anchor) + 1;
         } else if (anchor instanceof LinearLayout) {
             parent = (ViewGroup) anchor;
-            index = anchor.getChildCount();
+            index = parent.getChildCount();
         } else {
             parent = (ViewGroup) anchor;
             index = -1;
