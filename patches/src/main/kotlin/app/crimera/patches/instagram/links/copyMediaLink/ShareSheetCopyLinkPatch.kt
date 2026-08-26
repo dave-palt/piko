@@ -31,7 +31,7 @@ val shareSheetCopyLinkPatch =
     bytecodePatch(
         name = "Copy link row on share sheet",
         description =
-            "Adds a 'Copy link' row above the contacts list in the direct share sheet that copies the shared media link",
+            "Adds a 'Copy link' row to the bottom of the direct share sheet, alongside the copy-link and share option icons",
         default = true,
     ) {
         compatibleWith(COMPATIBILITY_INSTAGRAM)
