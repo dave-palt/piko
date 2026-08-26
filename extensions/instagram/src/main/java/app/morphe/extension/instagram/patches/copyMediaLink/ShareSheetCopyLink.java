@@ -285,8 +285,11 @@ public class ShareSheetCopyLink {
             index = -1;
         }
 
-        Logger.printInfo(() -> "ShareSheetCopyLink: anchor=" + anchor.getClass().getName()
-                + " parent=" + parent.getClass().getName() + " index=" + index);
+        final View anchorView = anchor;
+        final ViewGroup parentView = parent;
+        final int insertIndex = index;
+        Logger.printInfo(() -> "ShareSheetCopyLink: anchor=" + anchorView.getClass().getName()
+                + " parent=" + parentView.getClass().getName() + " index=" + insertIndex);
 
         buildRowInto(fragment, root, parent, index, 0);
     }
