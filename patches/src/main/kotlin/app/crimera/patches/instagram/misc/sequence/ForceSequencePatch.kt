@@ -25,14 +25,17 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 
 /**
- * "Is clip remixable" gate (X.07rQ.A0H) inside the reels overflow sheet builders.
- * When it returns false, the Remix/Sequence rows are only reachable through a long
- * original-media metadata chain, which is why Sequence goes missing on some reels.
+ * "Is clip remixable/sequenceable" gate (X.07rQ.A0I) inside the reels overflow
+ * sheet builders. This gate guards the CLIPS_MEDIA_REMIX and CLIPS_MEDIA_SEQUENCE
+ * rows; when it returns false, Sequence goes missing on non-remixable clips.
+ *
+ * Note: X.07rQ.A0H is a DIFFERENT gate (reuse/template settings, own reels only)
+ * and must not be forced.
  *
  * Method/field names and fingerprint strings verified against Instagram
  * 435.0.0.37.76 (arm64-v8a) and cross-checked on 444.0.0.46.85.
  */
-private const val REMIX_GATE_METHOD_NAME = "A0H"
+private const val REMIX_GATE_METHOD_NAME = "A0I"
 
 // Action sheet builder. "remix_prefetch" is logged only by the action-sheet
 // path of ClipsOrganicMediaItemViewMoreOptionsController (unique app-wide).
