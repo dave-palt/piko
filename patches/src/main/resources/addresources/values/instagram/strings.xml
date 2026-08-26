@@ -136,6 +136,8 @@ Note: On a clean install, the \'Tip\' animation may appear but will stop on its 
     <string name="piko_download_audio">Download audio</string>
     <string name="piko_download_options">Download options</string>
     <string name="piko_copy_media_link">Copy media link</string>
+    <string name="piko_share_sheet_copy_link">Show Copy media link in share sheet</string>
+    <string name="piko_force_sequence">Always allow Sequences on reels</string>
     <string name="piko_copied_media_link">Copied media link</string>
     <string name="piko_copy_current_media_link">Copy current media link</string>
     <string name="piko_copy_audio_link">Copy audio link</string>

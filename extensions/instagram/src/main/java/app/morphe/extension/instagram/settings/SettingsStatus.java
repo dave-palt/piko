@@ -55,7 +55,7 @@ public class SettingsStatus {
     public static boolean sanitizeShareLinks = false;
     public static void sanitizeShareLinks() {sanitizeShareLinks = true;}
     public static boolean linksSection() {
-        return (openLinksExternally || sanitizeShareLinks || copyMediaLink);
+        return (openLinksExternally || sanitizeShareLinks || copyMediaLink || shareSheetCopyLink);
     }
 
 
@@ -186,7 +186,7 @@ public class SettingsStatus {
     public static void moreOptionsOnPost() { moreOptionsOnPost = true; }
     public static boolean moreOptionsOnProfile = false;
     public static void moreOptionsOnProfile() { moreOptionsOnProfile = true; }
-    public static boolean miscSection() {return ( saveMediaCommentButton || moreOptionsOnProfile || moreOptionsOnPost || customiseStoryRingSize || changeLikeAnimation || unlockPlusBenefits || storiesAudioAutoplay || disableVideoAutoplay || removeEmptyBottomSpace || copyCommentButton || improveImageViewing || customiseStoryTimestamp || disableAnalytics || disableDiscoverPeople || followBackIndicator || viewStoryMentions || disableStoryFlipping || hideReshareButton);}
+    public static boolean miscSection() {return ( saveMediaCommentButton || moreOptionsOnProfile || moreOptionsOnPost || customiseStoryRingSize || changeLikeAnimation || unlockPlusBenefits || storiesAudioAutoplay || disableVideoAutoplay || removeEmptyBottomSpace || copyCommentButton || improveImageViewing || customiseStoryTimestamp || disableAnalytics || disableDiscoverPeople || followBackIndicator || viewStoryMentions || disableStoryFlipping || hideReshareButton || forceSequence);}
 
     //DM section
     public static boolean unlimitedReplaysOnEphemeralMedia = false;
@@ -207,6 +207,12 @@ public class SettingsStatus {
     //Copy media link.
     public static boolean copyMediaLink = false;
     public static void copyMediaLink() { copyMediaLink = true; }
+
+    public static boolean shareSheetCopyLink = false;
+    public static void shareSheetCopyLink() { shareSheetCopyLink = true; }
+
+    public static boolean forceSequence = false;
+    public static void forceSequence() { forceSequence = true; }
 
     public static boolean hideNavigationButtons = false;
     public static void hideNavigationButtons() { hideNavigationButtons = true; }
@@ -269,6 +275,8 @@ public class SettingsStatus {
         FLAGS.put(str("piko_sanitize_share_links"),SettingsStatus.sanitizeShareLinks);
         FLAGS.put(str("piko_open_links_externally"),SettingsStatus.openLinksExternally);
         FLAGS.put(str("piko_copy_media_link"),SettingsStatus.copyMediaLink);
+        FLAGS.put(str("piko_share_sheet_copy_link"),SettingsStatus.shareSheetCopyLink);
+        FLAGS.put(str("piko_force_sequence"),SettingsStatus.forceSequence);
         FLAGS.put(str("piko_download_voice_media"),SettingsStatus.downloadVoiceMessage);
         FLAGS.put(str("piko_download_with_external_downloader"),SettingsStatus.downloadWithExternalDownloader);
         FLAGS.put(str("piko_more_profile_options"),SettingsStatus.moreOptionsOnProfile);
