@@ -140,6 +140,7 @@ public class Links {
             return url.replaceAll("([&?])igsh=[^&]*", "")
                     .replaceAll("([&?])igshid=[^&]*", "")
                     .replaceAll("([&?])shid=[^&]*", "")
+                    .replaceAll("([&?])igsi=[^&]*", "")
                     .replaceAll("([&?])utm_source=[^&]*", "")
                     .replaceAll("([&?])utm_medium=[^&]*", "")
                     .replaceAll("([&?])utm_content=[^&]*", "")
