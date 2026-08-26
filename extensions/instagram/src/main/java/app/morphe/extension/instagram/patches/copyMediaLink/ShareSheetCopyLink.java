@@ -197,13 +197,14 @@ public class ShareSheetCopyLink {
             parent = (ViewGroup) anchor;
             index = -1;
         }
-        Logger.printInfo(() -> "ShareSheetCopyLink: anchor=" + anchor.getClass().getName()
-                + " parent=" + (parent != null ? parent.getClass().getName() : "null")
+        final View anchorView = anchor;
+        final ViewGroup parentView = parent;
+        Logger.printInfo(() -> "ShareSheetCopyLink: anchor=" + anchorView.getClass().getName()
+                + " parent=" + (parentView != null ? parentView.getClass().getName() : "null")
                 + " index=" + index);
         parent.addView(row, index, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     }
-
     private static void copyMediaLink(Object fragment, View v) {
         try {
             Object media = firstNonNull(fragment, fieldsOfType(fragment, MEDIA_CLASS));
