@@ -21,7 +21,7 @@ import app.morphe.patcher.util.smali.ExternalLabel
 import app.morphe.util.findFreeRegister
 import app.morphe.util.registersUsed
 import com.android.tools.smali.dexlib2.Opcode
-import com.android.tools.smali.dexlib2.iface.MethodReference
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 
 /**
