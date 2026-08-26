@@ -31,7 +31,7 @@ val shareSheetCopyLinkPatch =
     bytecodePatch(
         name = "Copy link row on share sheet",
         description =
-            "Adds copy buttons to the bottom of the direct share sheet: two side-by-side buttons (copy all / copy current) for gallery posts, a single copy-link button otherwise",
+            "Adds copy buttons to the bottom of the direct share sheet: two side-by-side buttons (copy current / copy all) for gallery posts, a single copy-link button otherwise",
         default = true,
     ) {
         compatibleWith(COMPATIBILITY_INSTAGRAM)
