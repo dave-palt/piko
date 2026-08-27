@@ -7,6 +7,7 @@
 package app.crimera.patches.instagram.misc.metaai
 
 import app.morphe.patcher.Fingerprint
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 
 // DM inbox search bar (com.instagram.direct.inbox.feature.searchbar.ui.SearchBar).
 // The Meta AI variant of the search bar is driven by the state object built
@@ -31,9 +32,19 @@ internal object MetaAiCustomActionButtonFingerprint : Fingerprint(
 
 // DM inbox search overlay result row (classic RecyclerView binder, not compose).
 // Reads the same 5Bu.A08 gate to decide whether to bind the "Ask Meta AI" row.
+// Several bindView methods share the logging string, so also require the
+// A08 gate read inside the implementation to pin the right class.
 internal object MetaAiSearchRowFingerprint : Fingerprint(
     strings = listOf("Required value was null."),
-    custom = { methodDef, _ -> methodDef.name == "bindView" },
+    custom = { methodDef, _ ->
+        methodDef.name == "bindView" &&
+            methodDef.implementation?.instructions?.any { inst ->
+                (inst as? ReferenceInstruction)
+                    ?.reference
+                    ?.toString()
+                    ?.contains("LX/5Bu;->A08:Z") == true
+            } == true
+    },
 )
 
 // Central REST request funnel: every IG REST endpoint is built here, with the
