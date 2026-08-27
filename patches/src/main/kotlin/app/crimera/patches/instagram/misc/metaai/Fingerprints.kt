@@ -28,3 +28,35 @@ internal object MetaAiCustomActionButtonFingerprint : Fingerprint(
     strings = listOf("com.instagram.direct.inbox.feature.searchbar.ui.MetaAiCustomActionButton (SearchBar.kt:464)"),
     returnType = "V",
 )
+
+// DM inbox search overlay result row (classic RecyclerView binder, not compose).
+// Reads the same 5Bu.A08 gate to decide whether to bind the "Ask Meta AI" row.
+internal object MetaAiSearchRowFingerprint : Fingerprint(
+    strings = listOf("Required value was null."),
+    custom = { methodDef, _ -> methodDef.name == "bindView" },
+)
+
+// Central REST request funnel: every IG REST endpoint is built here, with the
+// endpoint path in field A0G. Unique app-wide via its logging string.
+internal object RestRequestFunnelFingerprint : Fingerprint(
+    strings = listOf("Misconfigured cache information for request with path: %s"),
+)
+
+// Central GraphQL (Pando) request funnel: every GraphQL query object is built
+// here. The query name / persisted-query hash arrive as String params.
+internal object GraphQLRequestFunnelFingerprint : Fingerprint(
+    parameters = listOf(
+        "LX/ovR;",
+        "Lcom/facebook/pando/PandoRealtimeInfoJNI;",
+        "Ljava/lang/String;",
+        "Ljava/lang/String;",
+        "Ljava/lang/String;",
+        "Ljava/util/List;",
+        "Ljava/util/Map;",
+        "Ljava/util/Map;",
+        "Lkotlin/jvm/functions/Function1;",
+        "I",
+        "Z",
+    ),
+    returnType = "Lcom/facebook/pando/PandoGraphQLRequest;",
+)
