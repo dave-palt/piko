@@ -231,6 +231,28 @@ To patch with Twitter/X version 11.88 and above, you must include patches from a
 
 <!-- PATCHES_END -->
 
+## 🍴 Fork additions on top of upstream
+
+Settings added by this fork, by Morphe → Instagram sub-menu. All default to **on**.
+
+**Ads**
+| Setting | What it does |
+| --- | --- |
+| Disable Meta AI | Removes Meta AI surfaces app-wide (incl. search) by forcing the related server config flags off. |
+
+**Links**
+| Setting | What it does |
+| --- | --- |
+| Copy media link | Adds a copy-link option to the media ⋮ menu. |
+| Share sheet copy link | Adds a copy-link row to the system share sheet (media posts). |
+
+**Misc**
+| Setting | What it does |
+| --- | --- |
+| Force sequence | Forces the old Sequence-style feed instead of the algorithmic one. |
+| Read-only follow button | Follow/Following label on feed & reels post headers becomes read-only (tap does nothing). Profile page button is unaffected and keeps working. |
+| Show post timestamp | Shows the post's date/time next to the username in feed & reels headers. |
+
 ## 🛠️ Building
 
 To build Piko Patches, follow the [Morphe documentation](https://github.com/MorpheApp/morphe-documentation).
