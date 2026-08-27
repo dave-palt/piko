@@ -103,7 +103,7 @@ val disableMetaAiPatch =
                                 } == true
                         }.map { it.location.index to it.registersUsed[0] }
 
-                sites.sortedDescending().forEach { (idx, pathReg) ->
+                sites.sortedByDescending { it.first }.forEach { (idx, pathReg) ->
                     addInstructions(
                         idx + 1,
                         """
@@ -117,7 +117,7 @@ val disableMetaAiPatch =
             // GraphQL funnel: sanitize every String param at method head so
             // persisted-query hashes / query names for Meta AI never resolve.
             GraphQLRequestFunnelFingerprint.method.apply {
-                val stringParams = parameters.withIndex().filter { it.value == "Ljava/lang/String;" }
+                val stringParams = parameters.withIndex().filter { it.value.type == "Ljava/lang/String;" }
                 stringParams.forEach { (i, _) ->
                     addInstructions(
                         0,
