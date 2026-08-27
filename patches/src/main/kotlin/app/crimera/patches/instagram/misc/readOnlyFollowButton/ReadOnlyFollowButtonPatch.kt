@@ -49,7 +49,7 @@ val readOnlyFollowButtonPatch =
             FollowButtonFingerprint.method.apply {
                 val nullCheckIndex =
                     instructions.indexOfFirst {
-                        it.opcode == Opcode.INVOKE_STATIC &&
+                        it.opcode == Opcode.INVOKE_STATIC_RANGE &&
                             it.getReference<MethodReference>()?.let { ref ->
                                 ref.definingClass == "LX/3l9;" && ref.name == "A0R"
                             } == true
