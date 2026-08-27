@@ -13,26 +13,16 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Runtime helper for the network-level Meta AI block. Injected at the two
- * central request funnels (REST 2tK.A01 and GraphQL 6mu.A00): swaps any
- * Meta-AI endpoint path / query name for a dead one so the request can
- * never reach the server, regardless of which UI surface triggered it.
+ * Runtime helper for the network-level Meta AI block. Injected at the central
+ * REST request funnel (2tK.A01): swaps any Meta-AI endpoint path for a dead
+ * one so the request can never reach the server, regardless of which UI
+ * surface triggered it. (The GraphQL funnel 6mu.A00 is NOT hooked — see
+ * Fingerprints.kt for why.)
  */
 public class MetaAiBlock {
     private static final List<String> REST_PATHS = Arrays.asList(
             "direct_v2/ig_meta_ai_side_chat_send_contextual_query/",
             "cache/meta_ai_imagine");
-
-    // Case-sensitive camel/snake tokens: lowercased contains("kai") would
-    // false-positive on unrelated words inside query names.
-    private static final List<String> GQL_MATCHES = Arrays.asList(
-            "MetaAi",
-            "MetaAI",
-            "meta_ai",
-            "AiAgent",
-            "ai_agent",
-            "SocialKai",
-            "KaiInfo");
 
     // Evaluated on every call so the settings toggle takes effect at once.
     private static boolean enabled() {
@@ -46,14 +36,5 @@ public class MetaAiBlock {
             if (path.contains(m)) return "piko_meta_ai_blocked";
         }
         return path;
-    }
-
-    /** Returns a dead query name when the given GraphQL op is Meta-AI. */
-    public static String gqlName(String name) {
-        if (name == null || !enabled()) return name;
-        for (String m : GQL_MATCHES) {
-            if (name.contains(m)) return "piko_meta_ai_blocked";
-        }
-        return name;
     }
 }

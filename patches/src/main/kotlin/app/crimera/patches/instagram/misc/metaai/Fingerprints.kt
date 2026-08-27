@@ -55,6 +55,10 @@ internal object RestRequestFunnelFingerprint : Fingerprint(
 
 // Central GraphQL (Pando) request funnel: every GraphQL query object is built
 // here. The query name / persisted-query hash arrive as String params.
+// NOTE: deliberately NOT hooked — a rewritten query name is looked up in the
+// PandoQueryExecutor schema registry (6lt.A00) and an unknown name crashes
+// the app ("No PandoQueryExecutor configured for schema: null") instead of
+// failing the request gracefully. Kept for documentation purposes.
 internal object GraphQLRequestFunnelFingerprint : Fingerprint(
     parameters = listOf(
         "LX/ovR;",

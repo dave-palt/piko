@@ -114,20 +114,12 @@ val disableMetaAiPatch =
                 }
             }
 
-            // GraphQL funnel: sanitize every String param at method head so
-            // persisted-query hashes / query names for Meta AI never resolve.
-            GraphQLRequestFunnelFingerprint.method.apply {
-                val stringParams = parameters.withIndex().filter { it.value.type == "Ljava/lang/String;" }
-                stringParams.forEach { (i, _) ->
-                    addInstructions(
-                        0,
-                        """
-                        invoke-static {p$i}, $META_AI_BLOCK_CLASS->gqlName(Ljava/lang/String;)Ljava/lang/String;
-                        move-result-object p$i
-                        """.trimIndent(),
-                    )
-                }
-            }
+            // NOTE: the GraphQL funnel (6mu.A00) is deliberately NOT hooked.
+            // A rewritten query name does not fail the request — it is looked
+            // up in the PandoQueryExecutor schema registry (6lt.A00) and an
+            // unknown name crashes with "No PandoQueryExecutor configured for
+            // schema: null" instead of erroring gracefully. REST block + UI
+            // kills cover the user-visible surfaces.
 
             enableSettings("disableMetaAi")
         }
