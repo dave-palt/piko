@@ -17,6 +17,7 @@ public class Settings {
     public static final BooleanSetting OPEN_LINKS_EXTERNALLY = new BooleanSetting("open_links_externally", true);
     public static final BooleanSetting SANITIZE_SHARE_LINKS = new BooleanSetting("sanitize_share_links", true);
     public static final BooleanSetting HIDE_SUGGESTED_CONTENT = new BooleanSetting("hide_suggested_content", true);
+    public static final BooleanSetting DISABLE_META_AI = new BooleanSetting("disable_meta_ai", true);
     public static final BooleanSetting DEVELOPER_OPTIONS = new BooleanSetting("enable_developer_options", true);
     public static final BooleanSetting DIRECTLY_OPEN_METACONFIG = new BooleanSetting("directly_open_metaconfig",false);
     public static final BooleanSetting ENABLE_EMP_OPTIONS = new BooleanSetting("enable_employee_options",false);

@@ -78,6 +78,15 @@ public class ScreenBuilder {
                     )
             );
         }
+        if (SettingsStatus.disableMetaAi) {
+            addPreference(
+                    helper.switchPreference(
+                            str("piko_disable_meta_ai"),
+                            str("piko_disable_meta_ai_desc"),
+                            Settings.DISABLE_META_AI
+                    )
+            );
+        }
     }
 
     public void buildDeveloperSection() {

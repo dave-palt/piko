@@ -43,8 +43,13 @@ public class SettingsStatus {
     public static void hideSuggestedContent() {
         hideSuggestedContent = true;
     }
+
+    public static boolean disableMetaAi = false;
+    public static void disableMetaAi() {
+        disableMetaAi = true;
+    }
     public static boolean adsSection() {
-        return (disableAds || hideSuggestedContent);
+        return (disableAds || hideSuggestedContent || disableMetaAi);
     }
 
     //Links section.
