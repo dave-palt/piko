@@ -21,7 +21,7 @@ import app.morphe.util.findFreeRegister
 import app.morphe.util.getReference
 import app.morphe.util.registersUsed
 import com.android.tools.smali.dexlib2.Opcode
-import com.android.tools.smali.dexlib2.iface.Method
+import com.android.tools.smali.dexlib2.iface.MutableMethod
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
@@ -40,7 +40,7 @@ internal object PostHeaderUsernameFlowRowFingerprint : Fingerprint(
  * 0, leaving stock behavior byte-for-byte equivalent; with it on the branch
  * always takes the "timestamp visible" path.
  */
-private fun Method.forceGateAt(branchIndex: Int) {
+private fun MutableMethod.forceGateAt(branchIndex: Int) {
     val gateReg = getInstruction(branchIndex).registersUsed[0]
     val scratch = findFreeRegister(branchIndex)
     if (scratch < 0) error("no free register for gate forcing at index $branchIndex")
