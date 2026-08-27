@@ -181,6 +181,44 @@ val postTimestampPatch =
                 }
             }
 
+            // Classic (Litho) home-feed header: stock skips the entire
+            // timestamp section when the media has audio attribution
+            // (6dA.A0Q -> v64), which is why music posts hide the date.
+            // Conditionally zero the skip flag behind the toggle (OR-forcing
+            // would do the opposite here: the branch skips when non-zero);
+            // the timestamp entry then always joins the subtitle list
+            // alongside the music attribution.
+            FeedHeaderSubtitleListFingerprint.method.apply {
+                val a0qIndex = instructions.indexOfFirst {
+                    it.opcode == Opcode.INVOKE_STATIC &&
+                        it.getReference<MethodReference>()?.let { ref ->
+                            ref.definingClass == "LX/6dA;" && ref.name == "A0Q"
+                        } == true
+                }
+                if (a0qIndex == -1) error("6dA.A0Q call not found in feed header subtitle list builder")
+
+                var branchIndex = -1
+                for (i in a0qIndex + 1 until minOf(a0qIndex + 4, instructions.size)) {
+                    if (instructions[i].opcode == Opcode.IF_NEZ) {
+                        branchIndex = i
+                        break
+                    }
+                }
+                if (branchIndex == -1) error("audio-attribution skip branch after 6dA.A0Q not found")
+
+                val gateReg = getInstruction(branchIndex).registersUsed[0]
+                addInstructionsWithLabels(
+                    branchIndex,
+                    """
+                    $PREF_CALL_DESCRIPTOR->showPostTimestamp()Z
+                    move-result v0
+                    if-eqz v0, :piko_ts_audio_skip
+                    const/16 v$gateReg, 0x0
+                    """.trimIndent(),
+                    ExternalLabel("piko_ts_audio_skip", getInstruction(branchIndex)),
+                )
+            }
+
             enableSettings("showPostTimestamp")
         }
     }

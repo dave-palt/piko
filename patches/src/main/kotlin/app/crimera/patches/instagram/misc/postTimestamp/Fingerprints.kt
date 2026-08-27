@@ -29,6 +29,18 @@ internal object ReelsCaption2SYFingerprint : Fingerprint(
     },
 )
 
+// Classic (Litho) home-feed header subtitle-list builder (IG 435: X/7cq.A07,
+// the row_feed_profile_header secondary/tertiary label contents). Unique
+// app-wide log anchor; the method builds the 7lV subtitle-entry list that
+// decides what shows beside the username (music attribution, timestamp, ...).
+internal object FeedHeaderSubtitleListFingerprint : Fingerprint(
+    strings = listOf("MediaHeaderInvalidUiState"),
+    custom = { methodDef, _ ->
+        methodDef.name == "A07" &&
+            methodDef.parameterTypes.firstOrNull() == "Landroid/content/Context;"
+    },
+)
+
 // Barcelona PostHeaderUsername composable (feed + reels post header). The
 // if-nez v17 branch at the 135.A0M call picks between the flow-row (username
 // + timestamp) and the inline path (username only when K4g.A04 is set).
