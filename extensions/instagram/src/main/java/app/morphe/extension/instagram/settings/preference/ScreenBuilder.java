@@ -621,6 +621,24 @@ public class ScreenBuilder {
                     )
             );
         }
+        if (SettingsStatus.readOnlyFollowButton) {
+            addPreference(
+                    helper.switchPreference(
+                            str("piko_read_only_follow_button"),
+                            str("piko_read_only_follow_button_desc"),
+                            Settings.READ_ONLY_FOLLOW_BUTTON
+                    )
+            );
+        }
+        if (SettingsStatus.showPostTimestamp) {
+            addPreference(
+                    helper.switchPreference(
+                            str("piko_show_post_timestamp"),
+                            str("piko_show_post_timestamp_desc"),
+                            Settings.SHOW_POST_TIMESTAMP
+                    )
+            );
+        }
         if (SettingsStatus.copyCommentButton) {
             addPreference(
                     helper.switchPreference(
