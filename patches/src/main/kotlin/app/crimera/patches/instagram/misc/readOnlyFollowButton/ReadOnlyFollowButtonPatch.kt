@@ -128,7 +128,7 @@ val readOnlyFollowButtonPatch =
                     addInstructions(
                         idx,
                         """
-                        invoke-static {v$reg}, $NOOP_FUNCTION0_CLASS->noopListener(Landroid/view/View$OnClickListener;)Landroid/view/View$OnClickListener;
+                        invoke-static {v$reg}, $NOOP_FUNCTION0_CLASS->noopListener(Landroid/view/View${'$'}OnClickListener;)Landroid/view/View${'$'}OnClickListener;
                         move-result-object v$reg
                         """.trimIndent(),
                     )
