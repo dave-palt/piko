@@ -72,4 +72,7 @@ object Constants {
     // Read-only follow button: shared cached no-op Function0 supplier.
     // Call as: invoke-static/range {vN .. vN}, <CLASS>->noop(Ljava/lang/Object;)Ljava/lang/Object;
     const val NOOP_FUNCTION0_CLASS = "${PATCHES_DESCRIPTOR}/readOnlyFollowButton/ReadOnlyFollowButton;"
+
+    // Meta AI network block runtime helper (REST + GraphQL funnels).
+    const val META_AI_BLOCK_CLASS = "${PATCHES_DESCRIPTOR}/metaai/MetaAiBlock;"
 }

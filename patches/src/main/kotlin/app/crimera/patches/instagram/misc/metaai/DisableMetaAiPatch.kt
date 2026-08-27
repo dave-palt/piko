@@ -10,9 +10,11 @@ import app.crimera.patches.instagram.misc.hookFlags.hookFlagsPatch
 import app.crimera.patches.instagram.misc.settings.settingsPatch
 import app.crimera.patches.instagram.utils.Constants.COMPATIBILITY_INSTAGRAM
 import app.crimera.patches.instagram.utils.Constants.PREF_CALL_DESCRIPTOR
+import app.crimera.patches.instagram.utils.Constants.META_AI_BLOCK_CLASS
 import app.crimera.patches.instagram.utils.addFlags
 import app.crimera.patches.instagram.utils.enableSettings
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.instructions
 import app.morphe.patcher.patch.bytecodePatch
@@ -63,7 +65,7 @@ private fun MutableMethod.forceNoMetaAiButton() {
 val disableMetaAiPatch =
     bytecodePatch(
         name = "Disable Meta AI",
-        description = "Disables Meta AI entry points across the app (DMs, search, feed, reels, share sheet). Toggled in piko settings.",
+        description = "Disables Meta AI entry points across the app (DMs, search, feed, reels, share sheet) and blocks Meta AI network requests. Toggled in piko settings.",
     ) {
         compatibleWith(COMPATIBILITY_INSTAGRAM)
         dependsOn(
@@ -81,6 +83,51 @@ val disableMetaAiPatch =
             SearchBarContentFingerprint.method.apply { forceNoMetaAiButton() }
             SearchBarIconFingerprint.method.apply { forceNoMetaAiButton() }
             MetaAiCustomActionButtonFingerprint.method.apply { forceNoMetaAiButton() }
+
+            // DM inbox search overlay "Ask Meta AI" result row (classic view
+            // binder, not compose) — reads the same A08 gate.
+            MetaAiSearchRowFingerprint.method.apply { forceNoMetaAiButton() }
+
+            // Network-level block: rewrite the endpoint path at the central
+            // REST funnel so Meta AI requests can never be built, regardless
+            // of which surface triggered them.
+            RestRequestFunnelFingerprint.method.apply {
+                // Collect first, then inject in reverse so earlier insertions
+                // do not shift the indices of later sites.
+                val sites =
+                    instructions
+                        .filter {
+                            it.opcode == Opcode.IGET_OBJECT &&
+                                it.getReference<FieldReference>()?.let { ref ->
+                                    ref.definingClass == "LX/2tK;" && ref.name == "A0G"
+                                } == true
+                        }.map { it.location.index to it.registersUsed[0] }
+
+                sites.sortedDescending().forEach { (idx, pathReg) ->
+                    addInstructions(
+                        idx + 1,
+                        """
+                        invoke-static {v$pathReg}, $META_AI_BLOCK_CLASS->restPath(Ljava/lang/String;)Ljava/lang/String;
+                        move-result-object v$pathReg
+                        """.trimIndent(),
+                    )
+                }
+            }
+
+            // GraphQL funnel: sanitize every String param at method head so
+            // persisted-query hashes / query names for Meta AI never resolve.
+            GraphQLRequestFunnelFingerprint.method.apply {
+                val stringParams = parameters.withIndex().filter { it.value == "Ljava/lang/String;" }
+                stringParams.forEach { (i, _) ->
+                    addInstructions(
+                        0,
+                        """
+                        invoke-static {p$i}, $META_AI_BLOCK_CLASS->gqlName(Ljava/lang/String;)Ljava/lang/String;
+                        move-result-object p$i
+                        """.trimIndent(),
+                    )
+                }
+            }
 
             enableSettings("disableMetaAi")
         }
