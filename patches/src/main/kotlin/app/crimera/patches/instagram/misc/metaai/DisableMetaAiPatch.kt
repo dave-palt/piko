@@ -18,18 +18,19 @@ import app.morphe.patcher.extensions.InstructionExtensions.instructions
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.smali.ExternalLabel
-import app.morphe.util.findFreeRegister
 import app.morphe.util.getReference
 import app.morphe.util.registersUsed
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 
 /**
- * Neutralizes the `iget-boolean <reg>, <obj>, LX/5Bu;->A08:Z` read ("compose
- * the Meta AI search-bar button/icon") in a search-bar composable: when the
- * toggle is on the gate register is zeroed right after the stock read, so the
- * composable takes the stock no-Meta-AI path exactly as it does for users the
- * feature is disabled for. Off = stock behavior untouched.
+ * Neutralizes the `iget-boolean <gate>, <obj>, LX/5Bu;->A08:Z` read ("compose
+ * the Meta AI search-bar button/icon") in a search-bar composable. The gate
+ * register is dead right before the stock read (the iget overwrites it), so
+ * no scratch register is needed: with the toggle on, the gate register is
+ * zeroed and the stock read is skipped, making the following stock branch
+ * take the no-Meta-AI path — identical to a user the feature is disabled
+ * for. With the toggle off the stock read executes untouched.
  */
 private fun MutableMethod.forceNoMetaAiButton() {
     val igetIndex =
@@ -40,20 +41,21 @@ private fun MutableMethod.forceNoMetaAiButton() {
                 } == true
         }
     if (igetIndex == -1) error("5Bu.A08 read not found in ${this.name}")
+    if (igetIndex + 1 >= instructions.size) error("no branch after 5Bu.A08 read in ${this.name}")
 
     val gateReg = getInstruction(igetIndex).registersUsed[0]
-    val scratch = findFreeRegister(igetIndex + 1)
-    if (scratch < 0) error("no free register in ${this.name}")
 
     addInstructionsWithLabels(
-        igetIndex + 1,
+        igetIndex,
         """
         $PREF_CALL_DESCRIPTOR->disableMetaAi()Z
-        move-result v$scratch
-        if-eqz v$scratch, :piko_no_mai_keep
+        move-result v$gateReg
+        if-eqz v$gateReg, :piko_mai_stock
         const/4 v$gateReg, 0x0
+        goto :piko_mai_after
         """.trimIndent(),
-        ExternalLabel("piko_no_mai_keep", getInstruction(igetIndex + 1)),
+        ExternalLabel("piko_mai_stock", getInstruction(igetIndex)),
+        ExternalLabel("piko_mai_after", getInstruction(igetIndex + 1)),
     )
 }
 
