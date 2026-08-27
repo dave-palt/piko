@@ -2,7 +2,7 @@ package app.morphe.extension.instagram.patches.readOnlyFollowButton;
 
 import android.view.View;
 
-import app.morphe.extension.instagram.settings.Pref;
+import app.morphe.extension.instagram.utils.Pref;
 import app.morphe.extension.shared.Logger;
 
 /**
