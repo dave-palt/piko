@@ -150,6 +150,11 @@ public class HookFlags {
         BOOL_FLAGS.put("124136", false);  //ig_android_genai_music_in_feed_ads
         BOOL_FLAGS.put("124353", false);  //bcn_android_meta_ai_dm
         BOOL_FLAGS.put("125961", false);  //ig_android_meta_ai_voice_2_0
+        // DM-section "AI chats" row (not named meta_ai/gen_ai — missed by the
+        // original superset grep). Unsplit top-level flags, gated behind the
+        // same disable_meta_ai toggle.
+        BOOL_FLAGS.put("59918", false);   //ig_direct_ai_agents (0:is_enabled, 2:is_new_chat_entrypoint_enabled)
+        BOOL_FLAGS.put("71155", false);   //ig_android_direct_ai_agent_chats (0:is_direct_entry_point_enabled)
     }
 
     private static void profileActionBarFlags() {
