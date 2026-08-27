@@ -5,6 +5,8 @@
     <string name="piko_disable_ads">Disable ads</string>
     <string name="piko_hide_suggested_content">Hide suggested content</string>
     <string name="piko_hide_suggested_content_desc">Hides suggested stories, reels, threads (Suggested posts will still be shown).</string>
+    <string name="piko_disable_meta_ai">Disable Meta AI</string>
+    <string name="piko_disable_meta_ai_desc">Disables Meta AI entry points (DM chat, search suggestions, reels, share sheet).</string>
 
     <!-- Developer Options Section -->
     <string name="piko_category_dev_options">Developer options</string>

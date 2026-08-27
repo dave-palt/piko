@@ -46,10 +46,38 @@ public class HookFlags {
 
     // Thanks to @brosssh
     private static void suggestedContentFlags() {
-        BOOL_FLAGS.put("111509::3", false); //ig_search_ta_nullstate_suggestions::is_android_enabled
-        BOOL_FLAGS.put("82771::0", false); //igx_foundation_litho_stories_tray::is_litho_stories_tray_enabled
-        BOOL_FLAGS.put("109730", false); //ig_android_ai_discovery_menu
-        BOOL_FLAGS.put("80654", false); //ig_meta_ai_cdd_reels_viewer
+        if (Pref.hideSuggestedContent()) {
+            BOOL_FLAGS.put("111509::3", false); //ig_search_ta_nullstate_suggestions::is_android_enabled
+            BOOL_FLAGS.put("82771::0", false); //igx_foundation_litho_stories_tray::is_litho_stories_tray_enabled
+            BOOL_FLAGS.put("109730", false); //ig_android_ai_discovery_menu
+            BOOL_FLAGS.put("80654", false); //ig_meta_ai_cdd_reels_viewer
+        }
+    }
+
+    // Disables Meta AI surfaces app-wide: DM banner, auto popup, composer entry,
+    // search upsell/integration, discovery sheet, reels chain unit, share sheet.
+    private static void metaAiFlags() {
+        if (!Pref.disableMetaAi()) {
+            return;
+        }
+        BOOL_FLAGS.put("70413", false);  //ig_android_meta_ai_direct
+        BOOL_FLAGS.put("75278", false);  //ig_android_meta_ai_auto_popup
+        BOOL_FLAGS.put("76479", false);  //igd_metaai_composer_entrypoint
+        BOOL_FLAGS.put("104879", false); //igd_meta_ai_thread_banner
+        BOOL_FLAGS.put("108911", false); //ig_android_meta_ai_v2
+        BOOL_FLAGS.put("119736", false); //ig_search_meta_ai_upsell
+        BOOL_FLAGS.put("72411", false);  //meta_ai_discovery_sheet_ui
+        BOOL_FLAGS.put("70108", false);  //igd_android_meta_ai_discovery
+        BOOL_FLAGS.put("120893", false); //ig_meta_ai_in_reels_stories_unit
+        BOOL_FLAGS.put("71915", false);  //meta_ai_reels_chaining
+        BOOL_FLAGS.put("122162", false); //ig_android_meta_ai_2_share_sheet
+        BOOL_FLAGS.put("124353", false); //bcn_android_meta_ai_dm
+        BOOL_FLAGS.put("78970", false);  //ig_meta_ai_cdd_comments_sheet
+        BOOL_FLAGS.put("84760", false);  //ig_meta_ai_cdd_feed
+        BOOL_FLAGS.put("83278", false);  //meta_ai_media_share_sheet
+        BOOL_FLAGS.put("97010", false);  //igs2_meta_ai_app_top_position
+        BOOL_FLAGS.put("121836", false); //igd_meta_ai_upsell
+        BOOL_FLAGS.put("116406", false); //p92_android_meta_ai_reply_bot
     }
 
     private static void profileActionBarFlags() {

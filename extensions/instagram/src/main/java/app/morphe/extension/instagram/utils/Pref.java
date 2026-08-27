@@ -52,6 +52,10 @@ public class Pref {
         return SharedPref.getBooleanPref(Settings.HIDE_SUGGESTED_CONTENT);
     }
 
+    public static boolean disableMetaAi() {
+        return SharedPref.getBooleanPref(Settings.DISABLE_META_AI);
+    }
+
     public static boolean openLinksExternally() {
         return SharedPref.getBooleanPref(Settings.OPEN_LINKS_EXTERNALLY);
     }
