@@ -24,6 +24,7 @@ import com.android.tools.smali.dexlib2.Opcode
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction11x
 
 // Post header username row (barcelona, feed + reels). The invoke method
 // builds the K4g header state; its A05 boolean gates whether the post
@@ -197,16 +198,20 @@ val postTimestampPatch =
                 }
                 if (a0qIndex == -1) error("6dA.A0Q call not found in feed header subtitle list builder")
 
+                val skipReg =
+                    (getInstruction(a0qIndex + 1) as? Instruction11x)?.registerA
+                        ?: error("no move-result after 6dA.A0Q")
                 var branchIndex = -1
-                for (i in a0qIndex + 1 until minOf(a0qIndex + 4, instructions.size)) {
-                    if (instructions[i].opcode == Opcode.IF_NEZ) {
+                for (i in a0qIndex + 2 until instructions.size) {
+                    val insn = instructions[i]
+                    if (insn.opcode == Opcode.IF_NEZ && insn.registersUsed[0] == skipReg) {
                         branchIndex = i
                         break
                     }
                 }
                 if (branchIndex == -1) error("audio-attribution skip branch after 6dA.A0Q not found")
 
-                val gateReg = getInstruction(branchIndex).registersUsed[0]
+                val gateReg = skipReg
                 addInstructionsWithLabels(
                     branchIndex,
                     """
