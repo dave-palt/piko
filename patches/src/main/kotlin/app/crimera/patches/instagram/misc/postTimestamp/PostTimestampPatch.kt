@@ -59,7 +59,6 @@ val postTimestampPatch =
                     move-result v2
                     if-eqz v2, :piko_ts_skip
                     iput-boolean v2, v3, LX/K4g;->A05:Z
-                    :piko_ts_skip
                     """.trimIndent(),
                     ExternalLabel("piko_ts_skip", getInstruction(iputIndex + 1)),
                 )
