@@ -14,6 +14,8 @@ import app.morphe.extension.instagram.settings.SettingsStatus;
 import app.morphe.extension.instagram.constants.Constants;
 
 import app.morphe.extension.crimera.SharedPref;
+import app.morphe.extension.instagram.patches.postTimestamp.PostTimestampDebug;
+import app.morphe.extension.instagram.patches.readOnlyFollowButton.ReadOnlyFollowButton;
 
 @SuppressWarnings("unused")
 public class Pref {
@@ -302,11 +304,17 @@ public class Pref {
     }
 
     public static boolean readOnlyFollowButton() {
-        return SharedPref.getBooleanPref(Settings.READ_ONLY_FOLLOW_BUTTON) && SettingsStatus.readOnlyFollowButton;
+        boolean enabled = SharedPref.getBooleanPref(Settings.READ_ONLY_FOLLOW_BUTTON) && SettingsStatus.readOnlyFollowButton;
+        if (enabled) ReadOnlyFollowButton.logGateOnce();
+        else ReadOnlyFollowButton.logGateFalseOnce(SharedPref.getBooleanPref(Settings.READ_ONLY_FOLLOW_BUTTON), SettingsStatus.readOnlyFollowButton);
+        return enabled;
     }
 
     public static boolean showPostTimestamp() {
-        return SharedPref.getBooleanPref(Settings.SHOW_POST_TIMESTAMP) && SettingsStatus.showPostTimestamp;
+        boolean enabled = SharedPref.getBooleanPref(Settings.SHOW_POST_TIMESTAMP) && SettingsStatus.showPostTimestamp;
+        if (enabled) PostTimestampDebug.logGateOnce();
+        else PostTimestampDebug.logGateFalseOnce(SharedPref.getBooleanPref(Settings.SHOW_POST_TIMESTAMP), SettingsStatus.showPostTimestamp);
+        return enabled;
     }
 
     public static String externalDownloaderPackageName() {

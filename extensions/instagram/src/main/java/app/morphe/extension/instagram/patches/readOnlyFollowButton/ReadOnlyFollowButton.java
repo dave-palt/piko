@@ -20,6 +20,24 @@ import app.morphe.extension.shared.Logger;
  */
 public final class ReadOnlyFollowButton {
 
+    private static volatile boolean logged;
+
+    /** Diagnostic: logs once when the read-only gate evaluates true. */
+    public static void logGateOnce() {
+        if (logged) return;
+        logged = true;
+        Logger.printInfo(() -> "READ-ONLY GATE PASSED (Pref.readOnlyFollowButton()=true)");
+    }
+
+    private static volatile boolean loggedFalse;
+
+    /** Diagnostic: logs once when the read-only gate evaluates false, with both inputs. */
+    public static void logGateFalseOnce(boolean sharedPrefValue, boolean settingsStatusValue) {
+        if (loggedFalse) return;
+        loggedFalse = true;
+        Logger.printInfo(() -> "READ-ONLY GATE FALSE: sharedPref=" + sharedPrefValue + " settingsStatus=" + settingsStatusValue);
+    }
+
     private static volatile Object cachedNoOp;
 
     /**
