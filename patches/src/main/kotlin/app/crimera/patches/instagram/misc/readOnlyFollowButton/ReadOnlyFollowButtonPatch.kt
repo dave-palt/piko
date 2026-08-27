@@ -11,6 +11,7 @@ import app.crimera.patches.instagram.utils.Constants.COMPATIBILITY_INSTAGRAM
 import app.crimera.patches.instagram.utils.Constants.NOOP_FUNCTION0_CLASS
 import app.crimera.patches.instagram.utils.Constants.PREF_CALL_DESCRIPTOR
 import app.crimera.patches.instagram.utils.enableSettings
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.instructions
@@ -100,6 +101,37 @@ val readOnlyFollowButtonPatch =
                     """.trimIndent(),
                     ExternalLabel("piko_wkd_keep", getInstruction(d4kCallIndex)),
                 )
+            }
+
+            // ---- Site 3: 5b5.A05 (classic Litho/view wiring chokepoint) ----
+            // The home-feed inline_follow_button is NOT compose — its click
+            // listener is attached in 5b5.A05 at two 0es.A00(listener, view)
+            // calls: the primary site (:cond_97, listener v11 = custom field
+            // A00 or the default 5bJ follow action) and an experimental-gated
+            // variant (LLj, listener v0). Patch EVERY attach call, reading the
+            // listener register from each instruction itself. Both registers
+            // are dead across their calls; v0/v11 <= v15 so plain forms.
+            ViewFollowButtonWiringFingerprint.method.apply {
+                val attachSites =
+                    instructions.withIndex()
+                        .filter { (_, ins) ->
+                            ins.opcode == Opcode.INVOKE_STATIC &&
+                                ins.getReference<MethodReference>()?.let { ref ->
+                                    ref.definingClass == "LX/0es;" && ref.name == "A00"
+                                } == true
+                        }
+                        .map { (i, ins) -> i to ins.registersUsed.first() }
+                if (attachSites.isEmpty()) error("0es.A00 attach call not found in 5b5.A05")
+
+                attachSites.sortedByDescending { it.first }.forEach { (idx, reg) ->
+                    addInstructions(
+                        idx,
+                        """
+                        invoke-static {v$reg}, $NOOP_FUNCTION0_CLASS->noopListener(Landroid/view/View$OnClickListener;)Landroid/view/View$OnClickListener;
+                        move-result-object v$reg
+                        """.trimIndent(),
+                    )
+                }
             }
 
             enableSettings("readOnlyFollowButton")
