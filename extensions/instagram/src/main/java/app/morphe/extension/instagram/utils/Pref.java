@@ -301,6 +301,14 @@ public class Pref {
         return SharedPref.getBooleanPref(Settings.FORCE_SEQUENCE) && SettingsStatus.forceSequence;
     }
 
+    public static boolean readOnlyFollowButton() {
+        return SharedPref.getBooleanPref(Settings.READ_ONLY_FOLLOW_BUTTON) && SettingsStatus.readOnlyFollowButton;
+    }
+
+    public static boolean showPostTimestamp() {
+        return SharedPref.getBooleanPref(Settings.SHOW_POST_TIMESTAMP) && SettingsStatus.showPostTimestamp;
+    }
+
     public static String externalDownloaderPackageName() {
         return SharedPref.getStringPref(Settings.EXTERNAL_DOWNLOADER_PACKAGE_NAME);
     }

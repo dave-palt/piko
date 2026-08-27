@@ -68,4 +68,8 @@ object Constants {
 
     const val COMMENT_BUTTON_EXTENSION_CLASS = "${PATCHES_DESCRIPTOR}/comment"
     const val SHARE_SHEET_COPY_LINK_CLASS = "${PATCHES_DESCRIPTOR}/copyMediaLink/ShareSheetCopyLink;"
+
+    // Read-only follow button: shared cached no-op Function0 supplier.
+    // Call as: invoke-static/range {vN .. vN}, <CLASS>->noop(Ljava/lang/Object;)Ljava/lang/Object;
+    const val NOOP_FUNCTION0_CLASS = "${PATCHES_DESCRIPTOR}/readOnlyFollowButton/ReadOnlyFollowButton;"
 }

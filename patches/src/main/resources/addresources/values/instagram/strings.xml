@@ -7,6 +7,10 @@
     <string name="piko_hide_suggested_content_desc">Hides suggested stories, reels, threads (Suggested posts will still be shown).</string>
     <string name="piko_disable_meta_ai">Disable Meta AI</string>
     <string name="piko_disable_meta_ai_desc">Disables Meta AI entry points (DM chat, search suggestions, reels, share sheet).</string>
+    <string name="piko_read_only_follow_button">Read-only follow button</string>
+    <string name="piko_read_only_follow_button_desc">Post and reel header Follow becomes a read-only indicator; tapping does nothing. The profile page button keeps working.</string>
+    <string name="piko_show_post_timestamp">Show post timestamp</string>
+    <string name="piko_show_post_timestamp_desc">Shows the post date/time beside the username in post and reel headers.</string>
 
     <!-- Developer Options Section -->
     <string name="piko_category_dev_options">Developer options</string>

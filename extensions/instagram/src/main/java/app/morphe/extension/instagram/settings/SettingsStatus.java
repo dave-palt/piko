@@ -191,7 +191,7 @@ public class SettingsStatus {
     public static void moreOptionsOnPost() { moreOptionsOnPost = true; }
     public static boolean moreOptionsOnProfile = false;
     public static void moreOptionsOnProfile() { moreOptionsOnProfile = true; }
-    public static boolean miscSection() {return ( saveMediaCommentButton || moreOptionsOnProfile || moreOptionsOnPost || customiseStoryRingSize || changeLikeAnimation || unlockPlusBenefits || storiesAudioAutoplay || disableVideoAutoplay || removeEmptyBottomSpace || copyCommentButton || improveImageViewing || customiseStoryTimestamp || disableAnalytics || disableDiscoverPeople || followBackIndicator || viewStoryMentions || disableStoryFlipping || hideReshareButton || forceSequence);}
+    public static boolean miscSection() {return ( saveMediaCommentButton || moreOptionsOnProfile || moreOptionsOnPost || customiseStoryRingSize || changeLikeAnimation || unlockPlusBenefits || storiesAudioAutoplay || disableVideoAutoplay || removeEmptyBottomSpace || copyCommentButton || improveImageViewing || customiseStoryTimestamp || disableAnalytics || disableDiscoverPeople || followBackIndicator || viewStoryMentions || disableStoryFlipping || hideReshareButton || forceSequence || readOnlyFollowButton || showPostTimestamp);}
 
     //DM section
     public static boolean unlimitedReplaysOnEphemeralMedia = false;
@@ -218,6 +218,12 @@ public class SettingsStatus {
 
     public static boolean forceSequence = false;
     public static void forceSequence() { forceSequence = true; }
+
+    public static boolean readOnlyFollowButton = false;
+    public static void readOnlyFollowButton() { readOnlyFollowButton = true; }
+
+    public static boolean showPostTimestamp = false;
+    public static void showPostTimestamp() { showPostTimestamp = true; }
 
     public static boolean hideNavigationButtons = false;
     public static void hideNavigationButtons() { hideNavigationButtons = true; }
@@ -282,6 +288,8 @@ public class SettingsStatus {
         FLAGS.put(str("piko_copy_media_link"),SettingsStatus.copyMediaLink);
         FLAGS.put(str("piko_share_sheet_copy_link"),SettingsStatus.shareSheetCopyLink);
         FLAGS.put(str("piko_force_sequence"),SettingsStatus.forceSequence);
+        FLAGS.put(str("piko_read_only_follow_button"),SettingsStatus.readOnlyFollowButton);
+        FLAGS.put(str("piko_show_post_timestamp"),SettingsStatus.showPostTimestamp);
         FLAGS.put(str("piko_download_voice_media"),SettingsStatus.downloadVoiceMessage);
         FLAGS.put(str("piko_download_with_external_downloader"),SettingsStatus.downloadWithExternalDownloader);
         FLAGS.put(str("piko_more_profile_options"),SettingsStatus.moreOptionsOnProfile);

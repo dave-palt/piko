@@ -74,6 +74,8 @@ public class Settings {
     public static final BooleanSetting COPY_MEDIA_LINK = new BooleanSetting("copy_media_link", true);
     public static final BooleanSetting SHARE_SHEET_COPY_LINK = new BooleanSetting("share_sheet_copy_link", true);
     public static final BooleanSetting FORCE_SEQUENCE = new BooleanSetting("force_sequence", true);
+    public static final BooleanSetting READ_ONLY_FOLLOW_BUTTON = new BooleanSetting("read_only_follow_button", true);
+    public static final BooleanSetting SHOW_POST_TIMESTAMP = new BooleanSetting("show_post_timestamp", true);
 
     public static final BooleanSetting HIDE_NAVIGATION_FEED = new BooleanSetting("hide_navigation_feed", false);
     public static final BooleanSetting HIDE_NAVIGATION_REELS = new BooleanSetting("hide_navigation_reels", false);
