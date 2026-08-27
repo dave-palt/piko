@@ -155,6 +155,19 @@ public class HookFlags {
         // same disable_meta_ai toggle.
         BOOL_FLAGS.put("59918", false);   //ig_direct_ai_agents (0:is_enabled, 2:is_new_chat_entrypoint_enabled)
         BOOL_FLAGS.put("71155", false);   //ig_android_direct_ai_agent_chats (0:is_direct_entry_point_enabled)
+        // DM-inbox search bar Meta AI (meta icon + typed-query opens AI chat):
+        // the 59918/62485/61103 universal kills were already active — the
+        // surviving surface is driven by configs the original grep missed.
+        // NOTE: entries like 59918::55 are pointless — the universal "59918"
+        // entry returns early and shadows every subflag, so only ADD-ON
+        // configs (no universal entry) belong here.
+        BOOL_FLAGS.put("105426", false);  //igd_android_kai (DM AI sidechat, search entrypoint)
+        BOOL_FLAGS.put("114198", false);  //igd_ai_native (AI thread rows/compose)
+        BOOL_FLAGS.put("68131::2", false);  //android_igd_search_h1_2024::meta_ai_null_state_prompts_enabled
+        BOOL_FLAGS.put("68131::7", false);  //android_igd_search_h1_2024::enable_retain_gen_ai_section
+        BOOL_FLAGS.put("94546::21", true);  //igd_android_inbox_search_experiments::remove_ask_meta_ai_prompts (positive-remove)
+        BOOL_FLAGS.put("94598::135", false); //ig_search_client_multi_turn_search::is_android_large_ask_meta_ai_enabled
+        BOOL_FLAGS.put("109855::26", true);  //direct_android_core_messaging_26h1::remove_ai_pill (positive-remove)
     }
 
     private static void profileActionBarFlags() {
