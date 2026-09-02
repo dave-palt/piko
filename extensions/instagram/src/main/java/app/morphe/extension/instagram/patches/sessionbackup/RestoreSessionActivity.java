@@ -33,7 +33,8 @@ public class RestoreSessionActivity extends AppCompatActivity {
 
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("*/*");
+        intent.setType("application/json");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"application/json", "text/plain"});
         startActivityForResult(intent, OPEN_FILE_REQUEST_CODE);
     }
 
@@ -52,6 +53,18 @@ public class RestoreSessionActivity extends AppCompatActivity {
     }
 
     private void restore(Uri uri) {
+        // Cheap extension pre-check: SAF may hand us text/plain or octet-stream
+        // for .json files, so only reject clearly-wrong extensions here; the
+        // JSON parser below remains the real gate.
+        String name = uri.getLastPathSegment();
+        if (name != null) {
+            String lower = name.toLowerCase();
+            if (!lower.endsWith(".json") && !lower.endsWith(".txt")) {
+                Utils.showToastShort("Not a session backup file");
+                return;
+            }
+        }
+
         try (InputStream in = getContentResolver().openInputStream(uri)) {
             if (in == null) {
                 Utils.showToastShort("Failed to open file");
