@@ -193,9 +193,10 @@ public final class SessionBackup {
                     break;
                 }
             }
+            final boolean loggedOut = !hasAccount;
             Logger.printInfo(() -> "SessionBackup: isLoggedOut map size=" + headers.size()
-                    + " keys=" + headers.keySet() + " hasAccount=" + hasAccount);
-            return !hasAccount;
+                    + " keys=" + headers.keySet() + " loggedOut=" + loggedOut);
+            return loggedOut;
         } catch (Exception e) {
             Logger.printException(() -> "isLoggedOut check failed", e);
             return false;
