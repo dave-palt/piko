@@ -13,6 +13,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -72,16 +73,46 @@ public final class SessionBackup {
             }
 
             JSONObject json = new JSONObject();
-            json.put("version", 1);
+            json.put("version", 2);
 
-            JSONArray users = new JSONArray();
+            // Everything from AuthHeaderPrefs: numeric-id entries are account
+            // auth headers; DEVICE_HEADER_ID is the device identity the server
+            // binds the token to — both must travel together.
+            JSONObject headers = new JSONObject();
             for (Map.Entry<String, String> entry : authHeaders.entrySet()) {
-                JSONObject user = new JSONObject();
-                user.put("userId", entry.getKey());
-                user.put("authHeader", entry.getValue());
-                users.put(user);
+                headers.put(entry.getKey(), entry.getValue());
             }
-            json.put("users", users);
+            json.put("authHeaderPrefs", headers);
+
+            // RoutingHeaderPrefs (x-mid, region hint, SHBID/SHBTS...): the cask
+            // name is suffixed with the mid; find it by prefix scan.
+            JSONObject routing = new JSONObject();
+            try {
+                for (String name : caskNames(context)) {
+                    if (name.startsWith("RoutingHeaderPrefs")) {
+                        Object cask = caskByName(context, name);
+                        if (cask != null) {
+                            java.lang.reflect.Method getAll =
+                                    cask.getClass().getMethod("getAll");
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> all =
+                                    (Map<String, Object>) getAll.invoke(cask);
+                            if (all != null) {
+                                JSONObject inner = new JSONObject();
+                                for (Map.Entry<String, Object> e : all.entrySet()) {
+                                    if (e.getValue() instanceof String) {
+                                        inner.put(e.getKey(), (String) e.getValue());
+                                    }
+                                }
+                                routing.put(name, inner);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Logger.printException(() -> "export: routing prefs read failed", e);
+            }
+            json.put("routingHeaderPrefs", routing);
 
             SharedPreferences defaultPrefs = defaultSharedPreferences(context);
             String current = defaultPrefs != null ? defaultPrefs.getString("current", null) : null;
@@ -123,33 +154,73 @@ public final class SessionBackup {
         try {
             JSONObject json = new JSONObject(jsonText);
             int version = json.optInt("version", -1);
-            if (version != 1) {
+            if (version != 1 && version != 2) {
                 Logger.printInfo(() -> "import: unsupported version " + version);
                 return false;
             }
 
-            JSONArray users = json.optJSONArray("users");
-            if (users == null || users.length() == 0) {
-                Logger.printInfo(() -> "import: no users in JSON");
-                return false;
-            }
-
+            // v1: users[] of {userId, authHeader}. v2: full authHeaderPrefs map
+            // including DEVICE_HEADER_ID.
             Map<String, String> authHeaders = new HashMap<>();
-            for (int i = 0; i < users.length(); i++) {
-                JSONObject user = users.getJSONObject(i);
-                String userId = user.optString("userId", "");
-                String authHeader = user.optString("authHeader", "");
-                if (!userId.isEmpty() && !authHeader.isEmpty()) {
-                    authHeaders.put(userId, authHeader);
+            if (version >= 2) {
+                JSONObject headers = json.optJSONObject("authHeaderPrefs");
+                if (headers != null) {
+                    Iterator<String> it = headers.keys();
+                    while (it.hasNext()) {
+                        String key = it.next();
+                        String value = headers.optString(key, "");
+                        if (!value.isEmpty()) {
+                            authHeaders.put(key, value);
+                        }
+                    }
+                }
+            } else {
+                JSONArray users = json.optJSONArray("users");
+                if (users != null) {
+                    for (int i = 0; i < users.length(); i++) {
+                        JSONObject user = users.getJSONObject(i);
+                        String userId = user.optString("userId", "");
+                        String authHeader = user.optString("authHeader", "");
+                        if (!userId.isEmpty() && !authHeader.isEmpty()) {
+                            authHeaders.put(userId, authHeader);
+                        }
+                    }
                 }
             }
             if (authHeaders.isEmpty()) {
-                Logger.printInfo(() -> "import: all user entries missing credentials");
+                Logger.printInfo(() -> "import: no auth headers in JSON");
                 return false;
             }
 
             if (!writeAuthHeaderPrefs(context, authHeaders)) {
                 return false;
+            }
+
+            // RoutingHeaderPrefs: write each exported cask back under its own name.
+            if (version >= 2) {
+                JSONObject routing = json.optJSONObject("routingHeaderPrefs");
+                if (routing != null) {
+                    Iterator<String> casks = routing.keys();
+                    while (casks.hasNext()) {
+                        String caskName = casks.next();
+                        JSONObject inner = routing.optJSONObject(caskName);
+                        if (inner == null) {
+                            continue;
+                        }
+                        Map<String, String> entries = new HashMap<>();
+                        Iterator<String> keys = inner.keys();
+                        while (keys.hasNext()) {
+                            String k = keys.next();
+                            String v = inner.optString(k, "");
+                            if (!v.isEmpty()) {
+                                entries.put(k, v);
+                            }
+                        }
+                        if (!entries.isEmpty()) {
+                            writeCask(context, caskName, entries);
+                        }
+                    }
+                }
             }
 
             SharedPreferences.Editor editor = null;
@@ -208,10 +279,10 @@ public final class SessionBackup {
     // ------------------------------------------------------------------
 
     /**
-     * Instantiates X.2wz (the AuthHeaderPrefs cask) via X.2xf.A00, which picks
-     * the right encrypted-store transformer and memoizes it in X.2wz.A0A.
+     * Instantiates a cask via X.2xf.A00 (loader picks the right encrypted-store
+     * transformer and memoizes it in X.2wz.A0A).
      */
-    private static Object caskPrefs(Context context) throws Exception {
+    private static Object caskPrefs(Context context, String name) throws Exception {
         Class<?> loader = Class.forName(CLASS_PREF_LOADER);
         Object prefs = null;
         for (java.lang.reflect.Method m : loader.getDeclaredMethods()) {
@@ -222,7 +293,7 @@ public final class SessionBackup {
                     && (p[2] == long.class || p[2] == Long.class)
                     && (p[3] == boolean.class || p[3] == Boolean.class)) {
                 m.setAccessible(true);
-                prefs = m.invoke(null, context, AUTH_HEADER_PREFS, 0L, false);
+                prefs = m.invoke(null, context, name, 0L, false);
                 break;
             }
         }
@@ -230,6 +301,93 @@ public final class SessionBackup {
             throw new IllegalStateException("X.2xf.A00(Context,String,long,boolean) not found");
         }
         return prefs;
+    }
+
+    private static Object caskPrefs(Context context) throws Exception {
+        return caskPrefs(context, AUTH_HEADER_PREFS);
+    }
+
+    /**
+     * Enumerates cask names by listing the encrypted-store directory
+     * (files under <dataDir>/app_android_igapps_encryptedstore_single) plus
+     * plain-prefs fallback names present in shared_prefs.
+     */
+    private static java.util.List<String> caskNames(Context context) {
+        java.util.ArrayList<String> names = new java.util.ArrayList<>();
+        try {
+            java.io.File dataDir = new File(context.getApplicationInfo().dataDir);
+            java.io.File store = new File(dataDir, "app_android_igapps_encryptedstore_single");
+            java.io.File[] files = store.listFiles();
+            if (files != null) {
+                for (java.io.File f : files) {
+                    names.add(f.getName());
+                }
+            }
+        } catch (Exception e) {
+            Logger.printException(() -> "caskNames: store dir scan failed", e);
+        }
+        try {
+            java.io.File sp = new File(context.getApplicationInfo().dataDir, "shared_prefs");
+            java.io.File[] files = sp.listFiles();
+            if (files != null) {
+                for (java.io.File f : files) {
+                    String n = f.getName();
+                    if (n.endsWith(".xml") && n.startsWith("RoutingHeaderPrefs")) {
+                        names.add(n.substring(0, n.length() - 4));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Logger.printException(() -> "caskNames: shared_prefs scan failed", e);
+        }
+        Logger.printInfo(() -> "caskNames: " + names);
+        return names;
+    }
+
+    /** Opens the named cask (or null). */
+    private static Object caskByName(Context context, String name) {
+        try {
+            return caskPrefs(context, name);
+        } catch (Exception e) {
+            Logger.printException(() -> "caskByName(" + name + ") failed", e);
+            return null;
+        }
+    }
+
+    /** Writes a whole map into the named cask through its editor. */
+    private static boolean writeCask(Context context, String name, Map<String, String> entries) {
+        try {
+            Object prefs = caskPrefs(context, name);
+            Object editor = prefs.getClass().getMethod("AuT").invoke(prefs);
+            if (editor == null) {
+                throw new IllegalStateException("cask AuT() returned null");
+            }
+            java.lang.reflect.Method putString = null;
+            java.lang.reflect.Method apply = null;
+            for (java.lang.reflect.Method m : editor.getClass().getMethods()) {
+                if (apply == null && m.getName().equals("apply") && m.getParameterCount() == 0) {
+                    apply = m;
+                }
+                Class<?>[] p = m.getParameterTypes();
+                if (putString == null && m.getName().equals("G8l")
+                        && p.length == 2
+                        && String.class.isAssignableFrom(p[0])
+                        && String.class.isAssignableFrom(p[1])) {
+                    putString = m;
+                }
+            }
+            if (putString == null || apply == null) {
+                throw new IllegalStateException("cask editor G8l/apply not found");
+            }
+            for (Map.Entry<String, String> e : entries.entrySet()) {
+                putString.invoke(editor, e.getKey(), e.getValue());
+            }
+            apply.invoke(editor);
+            return true;
+        } catch (Exception e) {
+            Logger.printException(() -> "writeCask(" + name + ") failed", e);
+            return false;
+        }
     }
 
     /** Reads all auth header entries by calling X.2wz.getAll(). */
