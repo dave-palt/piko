@@ -48,6 +48,10 @@ public class ActivityHook {
             intent = new Intent(ctx,BackupPrefActivity.class);
         } else if (bundleKey.equals("piko_import_dev_overrides") || bundleKey.equals("piko_import_id_mapping")  || bundleKey.equals("piko_import_pref")) {
             intent = new Intent(ctx,RestorePrefActivity.class);
+        } else if (bundleKey.equals("piko_export_session")) {
+            intent = new Intent(ctx, app.morphe.extension.instagram.patches.sessionbackup.BackupSessionActivity.class);
+        } else if (bundleKey.equals("piko_import_session")) {
+            intent = new Intent(ctx, app.morphe.extension.instagram.patches.sessionbackup.RestoreSessionActivity.class);
         } else if (bundleKey.equals("piko_download_set_path")) {
             intent = new Intent(ctx,FolderPickerActivity.class);
         }

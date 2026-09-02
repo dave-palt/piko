@@ -886,6 +886,22 @@ public class ScreenBuilder {
 
         addPreference(
                 helper.buttonPreference(
+                        str("piko_export_session"),
+                        "",
+                        "piko_export_session"
+                )
+        );
+
+        addPreference(
+                helper.buttonPreference(
+                        str("piko_import_session"),
+                        "",
+                        "piko_import_session"
+                )
+        );
+
+        addPreference(
+                helper.buttonPreference(
                         str("piko_reset_pref"),
                         "",
                         "piko_reset_pref"
