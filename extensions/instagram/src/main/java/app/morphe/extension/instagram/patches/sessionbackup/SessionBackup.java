@@ -1,0 +1,303 @@
+/*
+ * Copyright (C) 2026 piko <https://github.com/crimera/piko>
+ *
+ * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
+ */
+
+package app.morphe.extension.instagram.patches.sessionbackup;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedOutputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+
+import app.morphe.extension.shared.Logger;
+
+/**
+ * Exports / imports the Instagram login session so the app can be reinstalled
+ * (or installed as a clone) without re-logging in.
+ *
+ * <p>IG 435 stores session credentials in an encrypted "cask" prefs file named
+ * {@code AuthHeaderPrefs} (AES/GCM via AndroidKeyStore), keyed by user id, plus
+ * the current-user JSON under the {@code current} key of the default
+ * (PreferenceManager) shared prefs. The encrypted file can only be read with
+ * the per-install keystore key, so export DECRYPTS through IG's own loader and
+ * import re-writes through it (a fresh install generates a new key; writing the
+ * plaintext through IG's writer re-encrypts with the new key).</p>
+ *
+ * <p>Access is reflective over the obfuscated classes (X.2xf static loader,
+ * X.2wz cask prefs) so no stubs are needed. Both classes live in classes1.dex
+ * on 435 and are stable there; every entry point logs on failure.</p>
+ *
+ * <p>Exported JSON shape:</p>
+ * <pre>
+ * {
+ *   "version": 1,
+ *   "users": [ {"userId": "...", "authHeader": "Bearer IGT:2:..."} ],
+ *   "current": "..." | null,
+ *   "userDataMap": { "<userId>": "<json text>" }   // optional
+ * }
+ * </pre>
+ */
+public final class SessionBackup {
+
+    private static final String TAG = "SessionBackup";
+
+    /** Obfuscated loader: X.2xf.A00(Context, String, long, boolean) -> X.2wz */
+    private static final String CLASS_PREF_LOADER = "X.2xf";
+    private static final String CLASS_CASK_PREFS = "X.2wz";
+    private static final String AUTH_HEADER_PREFS = "AuthHeaderPrefs";
+
+    private SessionBackup() {}
+
+    // ------------------------------------------------------------------
+    // Public API (called from BackupSessionActivity / RestoreSessionActivity)
+    // ------------------------------------------------------------------
+
+    /** Builds the session JSON from the current install. Returns null on failure. */
+    public static String exportSessionJson(Context context) {
+        try {
+            Map<String, String> authHeaders = readAuthHeaderPrefs(context);
+            if (authHeaders.isEmpty()) {
+                Logger.printInfo(() -> "export: AuthHeaderPrefs empty or unreadable");
+                return null;
+            }
+
+            JSONObject json = new JSONObject();
+            json.put("version", 1);
+
+            JSONArray users = new JSONArray();
+            for (Map.Entry<String, String> entry : authHeaders.entrySet()) {
+                JSONObject user = new JSONObject();
+                user.put("userId", entry.getKey());
+                user.put("authHeader", entry.getValue());
+                users.put(user);
+            }
+            json.put("users", users);
+
+            SharedPreferences defaultPrefs = defaultSharedPreferences(context);
+            String current = defaultPrefs != null ? defaultPrefs.getString("current", null) : null;
+            json.put("current", current == null ? JSONObject.NULL : current);
+
+            // "user_access_map" holds serialized user dicts (profile cache) that the
+            // session bootstrap parses; export it too so a fresh install can restore
+            // the account list without a server round-trip.
+            String userAccessMap = defaultPrefs != null ? defaultPrefs.getString("user_access_map", null) : null;
+            json.put("user_access_map", userAccessMap == null ? JSONObject.NULL : userAccessMap);
+
+            return json.toString(2);
+        } catch (Exception e) {
+            Logger.printException(() -> "exportSessionJson failed", e);
+            return null;
+        }
+    }
+
+    /** Writes the exported JSON to a SAF uri-selected stream. */
+    public static boolean writeExport(Context context, String jsonText, OutputStream stream) {
+        try {
+            BufferedOutputStream out = new BufferedOutputStream(stream, 8192);
+            out.write(jsonText.getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            return true;
+        } catch (Exception e) {
+            Logger.printException(() -> "writeExport failed", e);
+            return false;
+        }
+    }
+
+    /**
+     * Restores a session from exported JSON. Writes the auth header(s) into
+     * AuthHeaderPrefs via IG's encrypted-cask writer and seeds the default
+     * prefs' "current"/"user_access_map" values. Caller should restart the
+     * app afterwards so the session bootstrap picks everything up.
+     */
+    public static boolean importSessionJson(Context context, String jsonText) {
+        try {
+            JSONObject json = new JSONObject(jsonText);
+            int version = json.optInt("version", -1);
+            if (version != 1) {
+                Logger.printInfo(() -> "import: unsupported version " + version);
+                return false;
+            }
+
+            JSONArray users = json.optJSONArray("users");
+            if (users == null || users.length() == 0) {
+                Logger.printInfo(() -> "import: no users in JSON");
+                return false;
+            }
+
+            Map<String, String> authHeaders = new HashMap<>();
+            for (int i = 0; i < users.length(); i++) {
+                JSONObject user = users.getJSONObject(i);
+                String userId = user.optString("userId", "");
+                String authHeader = user.optString("authHeader", "");
+                if (!userId.isEmpty() && !authHeader.isEmpty()) {
+                    authHeaders.put(userId, authHeader);
+                }
+            }
+            if (authHeaders.isEmpty()) {
+                Logger.printInfo(() -> "import: all user entries missing credentials");
+                return false;
+            }
+
+            if (!writeAuthHeaderPrefs(context, authHeaders)) {
+                return false;
+            }
+
+            SharedPreferences.Editor editor = null;
+            SharedPreferences defaultPrefs = defaultSharedPreferences(context);
+            if (defaultPrefs != null) {
+                editor = defaultPrefs.edit();
+            }
+            if (editor == null) {
+                Logger.printInfo(() -> "import: default prefs unavailable for current/user_access_map");
+                return false;
+            }
+
+            if (!json.isNull("current")) {
+                editor.putString("current", json.getString("current"));
+            }
+            if (!json.isNull("user_access_map")) {
+                editor.putString("user_access_map", json.getString("user_access_map"));
+            }
+            editor.apply();
+
+            return true;
+        } catch (Exception e) {
+            Logger.printException(() -> "importSessionJson failed", e);
+            return false;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Encrypted AuthHeaderPrefs access (reflective over X.2xf / X.2wz)
+    // ------------------------------------------------------------------
+
+    /**
+     * Instantiates X.2wz (the AuthHeaderPrefs cask) via X.2xf.A00, which picks
+     * the right encrypted-store transformer and memoizes it in X.2wz.A0A.
+     */
+    private static Object caskPrefs(Context context) throws Exception {
+        Class<?> loader = Class.forName(CLASS_PREF_LOADER);
+        Object prefs = null;
+        for (java.lang.reflect.Method m : loader.getDeclaredMethods()) {
+            Class<?>[] p = m.getParameterTypes();
+            if (p.length == 4
+                    && Context.class.isAssignableFrom(p[0])
+                    && String.class.isAssignableFrom(p[1])
+                    && (p[2] == long.class || p[2] == Long.class)
+                    && (p[3] == boolean.class || p[3] == Boolean.class)) {
+                m.setAccessible(true);
+                prefs = m.invoke(null, context, AUTH_HEADER_PREFS, 0L, false);
+                break;
+            }
+        }
+        if (prefs == null) {
+            throw new IllegalStateException("X.2xf.A00(Context,String,long,boolean) not found");
+        }
+        return prefs;
+    }
+
+    /** Reads all auth header entries by calling X.2wz.getAll(). */
+    private static Map<String, String> readAuthHeaderPrefs(Context context) {
+        Map<String, String> result = new HashMap<>();
+        try {
+            Object prefs = caskPrefs(context);
+            java.lang.reflect.Method getAll = prefs.getClass().getMethod("getAll");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> all = (Map<String, Object>) getAll.invoke(prefs);
+            if (all != null) {
+                for (Map.Entry<String, Object> e : all.entrySet()) {
+                    Object v = e.getValue();
+                    if (v instanceof String) {
+                        result.put(e.getKey(), (String) v);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Logger.printException(() -> "readAuthHeaderPrefs failed (class layout drift?)", e);
+        }
+        return result;
+    }
+
+    /**
+     * Writes auth headers through X.2wz's editor (AuT() -> GuM, G8l(key, value),
+     * apply()) so values are encrypted with the CURRENT install's keystore key.
+     */
+    private static boolean writeAuthHeaderPrefs(Context context, Map<String, String> authHeaders) {
+        try {
+            Object prefs = caskPrefs(context);
+            Object editor = prefs.getClass().getMethod("AuT").invoke(prefs);
+            if (editor == null) {
+                throw new IllegalStateException("cask AuT() returned null");
+            }
+            java.lang.reflect.Method putString = null;
+            java.lang.reflect.Method apply = null;
+            for (java.lang.reflect.Method m : editor.getClass().getMethods()) {
+                if (apply == null && m.getName().equals("apply") && m.getParameterCount() == 0) {
+                    apply = m;
+                }
+                Class<?>[] p = m.getParameterTypes();
+                if (putString == null && m.getName().equals("G8l")
+                        && p.length == 2
+                        && String.class.isAssignableFrom(p[0])
+                        && String.class.isAssignableFrom(p[1])) {
+                    putString = m;
+                }
+            }
+            if (putString == null || apply == null) {
+                throw new IllegalStateException("cask editor G8l/apply not found");
+            }
+            for (Map.Entry<String, String> e : authHeaders.entrySet()) {
+                putString.invoke(editor, e.getKey(), e.getValue());
+            }
+            apply.invoke(editor);
+            return true;
+        } catch (Exception e) {
+            Logger.printException(() -> "writeAuthHeaderPrefs failed (class layout drift?)", e);
+            return false;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Default (PreferenceManager) shared prefs
+    // ------------------------------------------------------------------
+
+    /**
+     * The "current"/"user_access_map" keys live in PreferenceManager's default
+     * shared prefs ("com.instagram.android_preferences", clone-renamed along
+     * with the package). Resolved reflectively to avoid hardcoding the name.
+     */
+    private static SharedPreferences defaultSharedPreferences(Context context) {
+        // 1) PreferenceManager.getDefaultSharedPreferences (androidx or platform)
+        for (String cn : new String[] {
+                "androidx.preference.PreferenceManager",
+                "android.preference.PreferenceManager"}) {
+            try {
+                Class<?> pm = Class.forName(cn);
+                java.lang.reflect.Method getDefault = pm.getDeclaredMethod(
+                        "getDefaultSharedPreferences", Context.class);
+                Object prefs = getDefault.invoke(null, context);
+                if (prefs instanceof SharedPreferences) {
+                    return (SharedPreferences) prefs;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        // 2) Fall back to the conventional name
+        try {
+            return context.getSharedPreferences(context.getPackageName() + "_preferences", 0);
+        } catch (Exception e) {
+            Logger.printException(() -> "defaultSharedPreferences failed", e);
+            return null;
+        }
+    }
+}

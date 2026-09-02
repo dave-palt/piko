@@ -60,7 +60,8 @@ public class ButtonPref extends Preference {
 
                     if (key.equals("piko_export_dev_overrides") || key.equals("piko_import_dev_overrides") || key.equals("piko_import_id_mapping")
                             || key.equals("piko_export_pref") || key.equals("piko_import_pref")
-                            || key.equals("piko_download_set_path")) {
+                            || key.equals("piko_download_set_path")
+                            || key.equals("piko_export_session") || key.equals("piko_import_session")) {
                         ActivityHook.launchFragment((Activity) context, key);
                         
                     } else if (key.equals("piko_reset_pref")) {
@@ -109,6 +110,8 @@ public class ButtonPref extends Preference {
                 || key.equals("piko_import_id_mapping")
                 || key.equals("piko_export_pref")
                 || key.equals("piko_import_pref")
+                || key.equals("piko_export_session")
+                || key.equals("piko_import_session")
                 || key.equals("piko_reset_pref")
                 || key.equals("piko_download_set_path")
                 || key.equals("piko_delete_analytics_cache")

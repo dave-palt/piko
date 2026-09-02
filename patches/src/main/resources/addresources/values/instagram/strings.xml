@@ -187,6 +187,8 @@ Note: On a clean install, the \'Tip\' animation may appear but will stop on its 
     <string name="piko_category_about">About</string>
     <string name="piko_export_pref">Export Piko preferences</string>
     <string name="piko_import_pref">Import Piko preferences</string>
+    <string name="piko_export_session">Export login session</string>
+    <string name="piko_import_session">Import login session</string>
     <string name="piko_reset_pref">Reset Piko preferences</string>
     <string name="piko_reset_pref_success">Piko preferences deleted</string>
     <string name="piko_reset_pref_failed">Failed to delete Piko preferences</string>
