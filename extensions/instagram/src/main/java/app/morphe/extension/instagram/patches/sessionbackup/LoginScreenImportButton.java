@@ -116,11 +116,11 @@ public final class LoginScreenImportButton {
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             lp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-            // Hug the very bottom edge (below the stock login buttons, which
-            // sit higher); keep horizontal breathing room.
+            // Hug the bottom edge but stay inside the frame / clear of the
+            // gesture bar; below the stock login buttons, which sit higher.
             lp.leftMargin = dp(activity, 24);
             lp.rightMargin = dp(activity, 24);
-            lp.bottomMargin = dp(activity, 10);
+            lp.bottomMargin = dp(activity, 16);
             lp.topMargin = 0;
             content.addView(pill, lp);
             pill.bringToFront();
