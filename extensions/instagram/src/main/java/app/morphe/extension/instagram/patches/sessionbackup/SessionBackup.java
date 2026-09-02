@@ -180,7 +180,10 @@ public final class SessionBackup {
     /** True when no auth headers are stored (fresh install / logged out). */
     public static boolean isLoggedOut(Context context) {
         try {
-            return readAuthHeaderPrefs(context).isEmpty();
+            Map<String, String> headers = readAuthHeaderPrefs(context);
+            Logger.printInfo(() -> "SessionBackup: isLoggedOut map size=" + headers.size()
+                    + " keys=" + headers.keySet());
+            return headers.isEmpty();
         } catch (Exception e) {
             Logger.printException(() -> "isLoggedOut check failed", e);
             return false;

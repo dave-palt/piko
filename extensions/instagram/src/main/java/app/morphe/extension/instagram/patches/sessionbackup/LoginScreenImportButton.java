@@ -42,12 +42,16 @@ public final class LoginScreenImportButton {
      */
     public static void addImportButton(Activity activity) {
         try {
+            Logger.printInfo(() -> "LoginScreenImportButton: onCreate hook fired");
             if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+                Logger.printInfo(() -> "LoginScreenImportButton: activity not usable, skipping");
                 return;
             }
 
             // Only show when logged out: no stored auth headers.
-            if (!SessionBackup.isLoggedOut(activity)) {
+            boolean loggedOut = SessionBackup.isLoggedOut(activity);
+            Logger.printInfo(() -> "LoginScreenImportButton: loggedOut=" + loggedOut);
+            if (!loggedOut) {
                 return;
             }
 
