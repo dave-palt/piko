@@ -177,13 +177,25 @@ public final class SessionBackup {
         }
     }
 
-    /** True when no auth headers are stored (fresh install / logged out). */
+    /**
+     * True when no account auth headers are stored (fresh install / logged
+     * out). The store also holds non-account keys (e.g. DEVICE_HEADER_ID),
+     * so emptiness is not a valid check: an account header is one whose key
+     * is a numeric user id.
+     */
     public static boolean isLoggedOut(Context context) {
         try {
             Map<String, String> headers = readAuthHeaderPrefs(context);
+            boolean hasAccount = false;
+            for (String key : headers.keySet()) {
+                if (key != null && key.matches("\\d+")) {
+                    hasAccount = true;
+                    break;
+                }
+            }
             Logger.printInfo(() -> "SessionBackup: isLoggedOut map size=" + headers.size()
-                    + " keys=" + headers.keySet());
-            return headers.isEmpty();
+                    + " keys=" + headers.keySet() + " hasAccount=" + hasAccount);
+            return !hasAccount;
         } catch (Exception e) {
             Logger.printException(() -> "isLoggedOut check failed", e);
             return false;
