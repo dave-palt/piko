@@ -177,6 +177,16 @@ public final class SessionBackup {
         }
     }
 
+    /** True when no auth headers are stored (fresh install / logged out). */
+    public static boolean isLoggedOut(Context context) {
+        try {
+            return readAuthHeaderPrefs(context).isEmpty();
+        } catch (Exception e) {
+            Logger.printException(() -> "isLoggedOut check failed", e);
+            return false;
+        }
+    }
+
     // ------------------------------------------------------------------
     // Encrypted AuthHeaderPrefs access (reflective over X.2xf / X.2wz)
     // ------------------------------------------------------------------

@@ -8,7 +8,23 @@ package app.crimera.patches.instagram.misc.sessionbackup
 
 import app.crimera.patches.instagram.misc.settings.settingsPatch
 import app.crimera.patches.instagram.utils.Constants.COMPATIBILITY_INSTAGRAM
+import app.crimera.patches.instagram.utils.Constants.PATCHES_DESCRIPTOR
+import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.instructions
 import app.morphe.patcher.patch.bytecodePatch
+import com.android.tools.smali.dexlib2.Opcode
+
+private const val EXTENSION_CLASS_DESCRIPTOR =
+    "$PATCHES_DESCRIPTOR/sessionbackup/LoginScreenImportButton;"
+
+// com.instagram.modal.ModalActivity#onCreate — the login screen host.
+// Anchor "ModalActivity.onCreate" is unique app-wide (verified on 435).
+internal object ModalActivityOnCreateFingerprint : Fingerprint(
+    name = "onCreate",
+    definingClass = "Lcom/instagram/modal/ModalActivity;",
+    strings = listOf("ModalActivity.onCreate"),
+)
 
 @Suppress("unused")
 val sessionBackupPatch =
@@ -25,11 +41,21 @@ val sessionBackupPatch =
         )
 
         execute {
-            // Extension-only patch: the export/import UI lives in the piko
-            // settings About section (ButtonPref keys registered statically in
-            // ButtonPref.java / ActivityHook.java) and the backup/restore
-            // activities are added to the manifest by addSettingsActivityPatch.
-            // No bytecode injection is needed; the extension reads/writes IG's
-            // AuthHeaderPrefs via reflection at runtime.
+            // Add the "Import login session" pill to the login screen
+            // (ModalActivity) so a fresh install can restore a session
+            // without reaching piko settings. Inject before the final
+            // return-void (main success path; early exception returns skip).
+            ModalActivityOnCreateFingerprint.method.apply {
+                val returnIndex =
+                    instructions.indexOfLast { it.opcode == Opcode.RETURN_VOID }
+                require(returnIndex >= 0) { "ModalActivity.onCreate: no return-void found" }
+
+                addInstructions(
+                    returnIndex,
+                    """
+                    invoke-static {p0}, $EXTENSION_CLASS_DESCRIPTOR->addImportButton(Landroid/app/Activity;)V
+                    """.trimIndent(),
+                )
+            }
         }
     }
