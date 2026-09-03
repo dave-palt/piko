@@ -53,6 +53,17 @@ public class RestoreSessionActivity extends AppCompatActivity {
     }
 
     private void restore(Uri uri) {
+        // Importing over a LIVE session loses: the in-memory session keeps the
+        // old device identity while prefs now hold the new one, and the server
+        // rejects the mismatched combination after restart. Only import while
+        // logged out (fresh install, or after the login screen returns).
+        if (!app.morphe.extension.instagram.patches.sessionbackup.SessionBackup
+                .isLoggedOut(Utils.getContext())) {
+            Logger.printInfo(() -> "RestoreSessionActivity: refusing import, already logged in");
+            Utils.showToastShort("Already logged in — import only works while logged out");
+            return;
+        }
+
         // Cheap extension pre-check: SAF may hand us text/plain or octet-stream
         // for .json files, so only reject clearly-wrong extensions here; the
         // JSON parser below remains the real gate.
