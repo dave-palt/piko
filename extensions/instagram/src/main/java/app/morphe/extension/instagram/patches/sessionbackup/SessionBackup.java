@@ -73,7 +73,37 @@ public final class SessionBackup {
             }
 
             JSONObject json = new JSONObject();
-            json.put("version", 2);
+            json.put("version", 3);
+
+            // Piko's own settings (all patch toggles), so a migration also
+            // restores the user's piko configuration. Keys that don't map to
+            // patches in the target build are simply ignored by it.
+            JSONObject pikoSettings = new JSONObject();
+            try {
+                SharedPreferences piko =
+                        context.getSharedPreferences(
+                                app.morphe.extension.instagram.constants.Constants.PIKO_SETTINGS, 0);
+                Map<String, ?> all = piko.getAll();
+                if (all != null) {
+                    for (Map.Entry<String, ?> e : all.entrySet()) {
+                        Object v = e.getValue();
+                        if (v instanceof String) {
+                            pikoSettings.put(e.getKey(), (String) v);
+                        } else if (v instanceof Boolean) {
+                            pikoSettings.put(e.getKey(), (Boolean) v);
+                        } else if (v instanceof Float) {
+                            pikoSettings.put(e.getKey(), (Float) v);
+                        } else if (v instanceof Integer) {
+                            pikoSettings.put(e.getKey(), (Integer) v);
+                        } else if (v instanceof Long) {
+                            pikoSettings.put(e.getKey(), (Long) v);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Logger.printException(() -> "export: piko settings read failed", e);
+            }
+            json.put("pikoSettings", pikoSettings);
 
             // Everything from AuthHeaderPrefs: numeric-id entries are account
             // auth headers; DEVICE_HEADER_ID is the device identity the server
@@ -154,7 +184,7 @@ public final class SessionBackup {
         try {
             JSONObject json = new JSONObject(jsonText);
             int version = json.optInt("version", -1);
-            if (version != 1 && version != 2) {
+            if (version < 1 || version > 3) {
                 Logger.printInfo(() -> "import: unsupported version " + version);
                 return false;
             }
@@ -240,6 +270,36 @@ public final class SessionBackup {
                 editor.putString("user_access_map", json.getString("user_access_map"));
             }
             editor.apply();
+
+            // v3: restore piko settings (patch toggles) on top of the session.
+            if (version >= 3) {
+                JSONObject pikoSettings = json.optJSONObject("pikoSettings");
+                if (pikoSettings != null && pikoSettings.length() > 0) {
+                    try {
+                        SharedPreferences piko =
+                                context.getSharedPreferences(
+                                        app.morphe.extension.instagram.constants.Constants.PIKO_SETTINGS, 0);
+                        SharedPreferences.Editor pikoEditor = piko.edit();
+                        Iterator<String> it = pikoSettings.keys();
+                        while (it.hasNext()) {
+                            String key = it.next();
+                            Object value = pikoSettings.get(key);
+                            if (value instanceof Boolean) {
+                                pikoEditor.putBoolean(key, (Boolean) value);
+                            } else if (value instanceof String) {
+                                pikoEditor.putString(key, (String) value);
+                            } else if (value instanceof Number) {
+                                // Piko's numeric settings (e.g. ring size) are
+                                // StringSettings; round-trip as strings.
+                                pikoEditor.putString(key, String.valueOf(value));
+                            }
+                        }
+                        pikoEditor.apply();
+                    } catch (Exception e) {
+                        Logger.printException(() -> "import: piko settings write failed", e);
+                    }
+                }
+            }
 
             return true;
         } catch (Exception e) {
