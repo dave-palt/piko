@@ -153,21 +153,59 @@ public class Links {
         }
     }
 
+    /**
+     * Strips tracking query params from share links.
+     *
+     * Instagram share URLs carry no legitimate query params except
+     * {@code img_index} (carousel slide deep-link), so for Instagram hosts every
+     * query param is removed wholesale instead of chasing each new tracking
+     * param name (igsh, igshid, shid, igsi, ... keep rotating).
+     *
+     * Non-Instagram URLs (unwrapped {@code l.instagram.com/?u=} targets) can
+     * have functional params, so those only get the generic tracker denylist.
+     */
     public static String sanitizeUrl(String url){
         try{
-            return url.replaceAll("([&?])igsh=[^&]*", "")
-                    .replaceAll("([&?])igshid=[^&]*", "")
-                    .replaceAll("([&?])shid=[^&]*", "")
-                    .replaceAll("([&?])igsi=[^&]*", "")
-                    .replaceAll("([&?])utm_source=[^&]*", "")
-                    .replaceAll("([&?])utm_medium=[^&]*", "")
-                    .replaceAll("([&?])utm_content=[^&]*", "")
-                    .replaceAll("([&?])fbclid=[^&]*", "")
-                    .replaceAll("([&?])si=[^&]*", "");
+            if (url == null || url.indexOf('?') < 0) {
+                return url;
+            }
+
+            Uri parsed = Uri.parse(url);
+            String host = parsed.getHost();
+            if (host != null) {
+                host = host.toLowerCase();
+            }
+            boolean igHost = false;
+            if (host != null) {
+                igHost = host.equals("instagram.com") || host.endsWith(".instagram.com")
+                        || host.equals("instagr.am") || host.endsWith(".instagr.am");
+            }
+            if (igHost) {
+                Uri.Builder rebuilt = parsed.buildUpon().clearQuery();
+                String imgIndex = parsed.getQueryParameter("img_index");
+                if (imgIndex != null) {
+                    rebuilt.appendQueryParameter("img_index", imgIndex);
+                }
+                return rebuilt.build().toString();
+            }
+
+            return stripTrackingParams(url);
         } catch (Exception e) {
             Logger.printException(() -> "sanitizeUrl failed: ", e);
         }
         return url;
+    }
+
+    private static String stripTrackingParams(String url) {
+        return url.replaceAll("([&?])igsh=[^&]*", "")
+                .replaceAll("([&?])igshid=[^&]*", "")
+                .replaceAll("([&?])shid=[^&]*", "")
+                .replaceAll("([&?])igsi=[^&]*", "")
+                .replaceAll("([&?])utm_source=[^&]*", "")
+                .replaceAll("([&?])utm_medium=[^&]*", "")
+                .replaceAll("([&?])utm_content=[^&]*", "")
+                .replaceAll("([&?])fbclid=[^&]*", "")
+                .replaceAll("([&?])si=[^&]*", "");
     }
 
     public static boolean signatureCheck(Object appIdentityObject){
