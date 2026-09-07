@@ -35,6 +35,8 @@ jobs:
 
       - name: Build .mpp
         run: ./gradlew clean buildAndroid
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download APK base
         run: |
