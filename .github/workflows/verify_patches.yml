@@ -1,0 +1,83 @@
+name: Verify patches against real APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'patches/**'
+      - 'extensions/**'
+      - '.github/workflows/verify_patches.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Patch Instagram ${{ matrix.version }} with .mpp
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Keep in sync with the stable AppTarget in
+          # patches/.../instagram/utils/Constants.kt and with the asset
+          # name on the `apk-bases` release tag.
+          - version: '435.0.0.37.76'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build .mpp
+        run: ./gradlew clean buildAndroid
+
+      - name: Download APK base
+        run: |
+          mkdir -p bases
+          gh release download apk-bases -R "$GITHUB_REPOSITORY" \
+            -p "instagram-${{ matrix.version }}.apkm" -D bases
+          ls -la bases/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download morphe-cli
+        run: |
+          curl -fsSL -o morphe-cli.jar \
+            "https://github.com/MorpheApp/morphe-desktop/releases/download/v1.15.0/morphe-desktop-1.15.0-all.jar"
+          java -jar morphe-cli.jar -V
+
+      - name: Patch and require every default patch to apply
+        run: |
+          set -o pipefail
+          mpp=$(ls patches/build/libs/patches-*.mpp | head -1)
+          java -jar morphe-cli.jar patch \
+            -p "$mpp" \
+            -o patched.apk \
+            bases/instagram-${{ matrix.version }}.apkm 2>&1 | tee patch.log
+
+          # Any patch failure fails the build
+          if grep -qE "SEVERE: FAILED|Patching aborted" patch.log; then
+            echo "::error::One or more patches failed to apply"
+            grep -E "SEVERE: FAILED" patch.log || true
+            exit 1
+          fi
+
+          # Sanity: output must be a valid APK containing our extension classes
+          unzip -l patched.apk > /dev/null
+          if ! unzip -p patched.apk classes.dex | strings | grep -q "app/morphe/extension"; then
+            echo "::error::Extension classes missing from output APK"
+            exit 1
+          fi
+          echo "All patches applied cleanly."
+
+      - name: Upload patch log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: patch-log-${{ matrix.version }}
+          path: patch.log
