@@ -70,69 +70,65 @@ val sanitizeShareLinksPatch =
                 }
             }
 
-            hookLocalShareLinks()
+            // Short-circuit the share-URL network round-trips: the server
+            // response only wraps a URL derivable from on-device data
+            // (shortcode / username) plus an igsh tracking token that
+            // sanitizeUrl strips anyway. When the toggle is on, the
+            // request-builder methods return a locally-completed X/2Hd task;
+            // the extension helper returns null on any failure, which falls
+            // through to the original network request.
+
+            // X/MFy.A00(UserSession, Media, 6xB, Integer, String)LX/2Hd — media permalink.
+            // Pass the raw Media (p1); the extension resolves shortcode/type
+            // via MediaData. Carousel index (6xB.A07) is read with a null guard.
+            MediaPermalinkRequestFingerprint.method.apply {
+                addInstructionsWithLabels(
+                    0,
+                    """
+                    const/4 v0, 0x0
+                    if-eqz p2, :piko_mfy_call
+                    iget v1, p2, LX/6xB;->A07:I
+                    move v0, v1
+                    :piko_mfy_call
+                    invoke-static {p1, v0}, $LOCAL_SHARE_LINK_CLASS->mediaPermalink(Ljava/lang/Object;I)Ljava/lang/Object;
+                    move-result-object v2
+                    if-eqz v2, :piko_mfy_keep
+                    return-object v2
+                    """.trimIndent(),
+                    ExternalLabel("piko_mfy_keep", getInstruction(0)),
+                )
+            }
+
+            // X/MFy.A03(UserSession, Integer, String username, String mediaId, String)LX/2Hd — story item.
+            // Username/mediaId are the raw params; the repo method itself
+            // trims mediaId at '_' afterwards (the extension mirrors that).
+            StoryItemUrlRequestFingerprint.method.apply {
+                addInstructionsWithLabels(
+                    0,
+                    """
+                    invoke-static {p3, p4}, $LOCAL_SHARE_LINK_CLASS->storyItemUrl(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
+                    move-result-object v0
+                    if-eqz v0, :piko_mfy3_keep
+                    return-object v0
+                    """.trimIndent(),
+                    ExternalLabel("piko_mfy3_keep", getInstruction(0)),
+                )
+            }
+
+            // X/KFb.A00(UserSession, Integer, String username, String)LX/2Hd — profile.
+            ProfileUrlRequestFingerprint.method.apply {
+                addInstructionsWithLabels(
+                    0,
+                    """
+                    invoke-static {p2}, $LOCAL_SHARE_LINK_CLASS->profileUrl(Ljava/lang/String;)Ljava/lang/Object;
+                    move-result-object v0
+                    if-eqz v0, :piko_kfb_keep
+                    return-object v0
+                    """.trimIndent(),
+                    ExternalLabel("piko_kfb_keep", getInstruction(0)),
+                )
+            }
 
             enableSettings("sanitizeShareLinks")
-        }
-    }
-
-    /**
-     * Short-circuits the share-URL network round-trips: the server response
-     * only wraps a URL derivable from on-device data (shortcode / username)
-     * plus an igsh tracking token that sanitizeUrl strips anyway. When the
-     * toggle is on, the request-builder methods return a locally-completed
-     * X/2Hd task instead; the extension helper returns null on any failure,
-     * which falls through to the original network request.
-     */
-    private fun hookLocalShareLinks() {
-        // X/MFy.A00(UserSession, Media, 6xB, Integer, String)LX/2Hd — media permalink.
-        // Pass the raw Media (p1); the extension resolves shortcode/type via
-        // MediaData. Carousel index (6xB.A07) is read with a null guard.
-        MediaPermalinkRequestFingerprint.method.apply {
-            addInstructionsWithLabels(
-                0,
-                """
-                const/4 v0, 0x0
-                if-eqz p2, :piko_mfy_call
-                iget v1, p2, LX/6xB;->A07:I
-                move v0, v1
-                :piko_mfy_call
-                invoke-static {p1, v0}, ${LOCAL_SHARE_LINK_CLASS}->mediaPermalink(Ljava/lang/Object;I)Ljava/lang/Object;
-                move-result-object v2
-                if-eqz v2, :piko_mfy_keep
-                return-object v2
-                """.trimIndent(),
-                ExternalLabel("piko_mfy_keep", getInstruction(0)),
-            )
-        }
-
-        // X/MFy.A03(UserSession, Integer, String username, String mediaId, String)LX/2Hd — story item.
-        // Username/mediaId are the raw params; the repo method itself trims
-        // mediaId at '_' afterwards (extension mirrors that for the URL).
-        StoryItemUrlRequestFingerprint.method.apply {
-            addInstructionsWithLabels(
-                0,
-                """
-                invoke-static {p3, p4}, ${LOCAL_SHARE_LINK_CLASS}->storyItemUrl(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
-                move-result-object v0
-                if-eqz v0, :piko_mfy3_keep
-                return-object v0
-                """.trimIndent(),
-                ExternalLabel("piko_mfy3_keep", getInstruction(0)),
-            )
-        }
-
-        // X/KFb.A00(UserSession, Integer, String username, String)LX/2Hd — profile.
-        ProfileUrlRequestFingerprint.method.apply {
-            addInstructionsWithLabels(
-                0,
-                """
-                invoke-static {p2}, ${LOCAL_SHARE_LINK_CLASS}->profileUrl(Ljava/lang/String;)Ljava/lang/Object;
-                move-result-object v0
-                if-eqz v0, :piko_kfb_keep
-                return-object v0
-                """.trimIndent(),
-                ExternalLabel("piko_kfb_keep", getInstruction(0)),
-            )
         }
     }
