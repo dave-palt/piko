@@ -42,3 +42,23 @@ internal object LiveUrlResponseImplFingerprint : Fingerprint(
     returnType = "Ljava/lang/String;",
     definingClass = "Lcom/instagram/request/LiveItemLinkUrlResponseImpl;",
 )
+
+// Share-URL request builders (local short-circuit targets). Each anchor
+// string is unique app-wide in 435 (verified via strings classes*.dex).
+// X/MFy.A00(UserSession, Media, 6xB, Integer, String) — media permalink.
+internal object MediaPermalinkRequestFingerprint : Fingerprint(
+    strings = listOf("media/%s/permalink/"),
+    returnType = "LX/2Hd;",
+)
+
+// X/MFy.A03(UserSession, Integer, String username, String mediaId, String) — story item.
+internal object StoryItemUrlRequestFingerprint : Fingerprint(
+    strings = listOf("third_party_sharing/%s/%s/get_story_item_url/"),
+    returnType = "LX/2Hd;",
+)
+
+// X/KFb.A00(UserSession, Integer, String username, String) — profile.
+internal object ProfileUrlRequestFingerprint : Fingerprint(
+    strings = listOf("third_party_sharing/%s/get_profile_to_share_url/"),
+    returnType = "LX/2Hd;",
+)
