@@ -74,6 +74,9 @@ object Constants {
     // Call as: invoke-static/range {vN .. vN}, <CLASS>->noop(Ljava/lang/Object;)Ljava/lang/Object;
     const val NOOP_FUNCTION0_CLASS = "${PATCHES_DESCRIPTOR}/readOnlyFollowButton/ReadOnlyFollowButton;"
 
+    // Local share-link short-circuit (no-network share URLs).
+    const val LOCAL_SHARE_LINK_CLASS = "${PATCHES_DESCRIPTOR}/localShareLink/LocalShareLink;"
+
     // Meta AI network block runtime helper (REST + GraphQL funnels).
     const val META_AI_BLOCK_CLASS = "${PATCHES_DESCRIPTOR}/metaai/MetaAiBlock;"
 }
