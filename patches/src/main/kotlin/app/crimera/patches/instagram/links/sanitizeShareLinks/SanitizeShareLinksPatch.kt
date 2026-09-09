@@ -101,6 +101,7 @@ val sanitizeShareLinksPatch =
                     invoke-static {p1, v0}, $LOCAL_SHARE_LINK_CLASS->mediaPermalink(Ljava/lang/Object;I)Ljava/lang/Object;
                     move-result-object v2
                     if-eqz v2, :piko_mfy_keep
+                    check-cast v2, LX/2Hd;
                     return-object v2
                     """.trimIndent(),
                     ExternalLabel("piko_mfy_keep", getInstruction(0)),
@@ -120,6 +121,7 @@ val sanitizeShareLinksPatch =
                     invoke-static {p3, p4}, $LOCAL_SHARE_LINK_CLASS->storyItemUrl(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
                     move-result-object v0
                     if-eqz v0, :piko_mfy3_keep
+                    check-cast v0, LX/2Hd;
                     return-object v0
                     """.trimIndent(),
                     ExternalLabel("piko_mfy3_keep", getInstruction(0)),
@@ -137,6 +139,7 @@ val sanitizeShareLinksPatch =
                     invoke-static {p2}, $LOCAL_SHARE_LINK_CLASS->profileUrl(Ljava/lang/String;)Ljava/lang/Object;
                     move-result-object v0
                     if-eqz v0, :piko_kfb_keep
+                    check-cast v0, LX/2Hd;
                     return-object v0
                     """.trimIndent(),
                     ExternalLabel("piko_kfb_keep", getInstruction(0)),
