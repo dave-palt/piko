@@ -64,6 +64,15 @@ public class Pref {
         return SharedPref.getBooleanPref(Settings.SANITIZE_SHARE_LINKS);
     }
 
+    /**
+     * Debug kill-switch for the local share-link short-circuit (fork31).
+     * Default OFF = the dormant local-URL path stays disabled and share
+     * requests go to the network as before. Flip only for debugging.
+     */
+    public static boolean pikoDebugKillSwitch() {
+        return SharedPref.getBooleanPref(Settings.PIKO_DEBUG_KILL_SWITCH);
+    }
+
     public static boolean getTurnOnAllGhostModes() {
         return SharedPref.getBooleanPref(Settings.TURN_ON_ALL_GHOST_MODES);
     }
