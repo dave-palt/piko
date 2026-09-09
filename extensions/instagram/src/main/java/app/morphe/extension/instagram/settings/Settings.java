@@ -16,6 +16,8 @@ public class Settings {
     public static final BooleanSetting DISABLE_ADS = new BooleanSetting("disable_ads", true);
     public static final BooleanSetting OPEN_LINKS_EXTERNALLY = new BooleanSetting("open_links_externally", true);
     public static final BooleanSetting SANITIZE_SHARE_LINKS = new BooleanSetting("sanitize_share_links", true);
+    // Debug-only: enables the dormant local share-link short-circuit (fork30 regression). Never ship enabled.
+    public static final BooleanSetting PIKO_DEBUG_KILL_SWITCH = new BooleanSetting("piko_debug_kill_switch", false);
     public static final BooleanSetting HIDE_SUGGESTED_CONTENT = new BooleanSetting("hide_suggested_content", true);
     public static final BooleanSetting DISABLE_META_AI = new BooleanSetting("disable_meta_ai", true);
     public static final BooleanSetting DEVELOPER_OPTIONS = new BooleanSetting("enable_developer_options", true);

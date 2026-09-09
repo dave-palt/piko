@@ -10,6 +10,7 @@ import app.crimera.patches.instagram.misc.settings.settingsPatch
 import app.crimera.patches.instagram.utils.Constants.COMPATIBILITY_INSTAGRAM
 import app.crimera.patches.instagram.utils.Constants.LINKS_DESCRIPTOR
 import app.crimera.patches.instagram.utils.Constants.LOCAL_SHARE_LINK_CLASS
+import app.crimera.patches.instagram.utils.PREF_CALL_DESCRIPTOR
 import app.crimera.patches.instagram.utils.enableSettings
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
@@ -78,6 +79,11 @@ val sanitizeShareLinksPatch =
             // the extension helper returns null on any failure, which falls
             // through to the original network request.
 
+            // Local share-link short-circuit is DORMANT pending on-device
+            // debugging (fork30 regression: icon didn't swap + delayed crash).
+            // Gated behind the piko_debug_kill_switch pref so the code stays
+            // reachable for a debug build without rebuilding the bundle.
+            //
             // X/MFy.A00(UserSession, Media, 6xB, Integer, String)LX/2Hd — media permalink.
             // Pass the raw Media (p1); the extension resolves shortcode/type
             // via MediaData. Carousel index (6xB.A07) is read with a null guard.
@@ -85,6 +91,9 @@ val sanitizeShareLinksPatch =
                 addInstructionsWithLabels(
                     0,
                     """
+                    invoke-static {}, Lapp/morphe/extension/instagram/utils/Pref;->pikoDebugKillSwitch()Z
+                    move-result v2
+                    if-eqz v2, :piko_mfy_keep
                     const/4 v0, 0x0
                     if-eqz p2, :piko_mfy_call
                     iget v1, p2, LX/6xB;->A07:I
@@ -106,6 +115,9 @@ val sanitizeShareLinksPatch =
                 addInstructionsWithLabels(
                     0,
                     """
+                    invoke-static {}, Lapp/morphe/extension/instagram/utils/Pref;->pikoDebugKillSwitch()Z
+                    move-result v0
+                    if-eqz v0, :piko_mfy3_keep
                     invoke-static {p3, p4}, $LOCAL_SHARE_LINK_CLASS->storyItemUrl(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
                     move-result-object v0
                     if-eqz v0, :piko_mfy3_keep
@@ -120,6 +132,9 @@ val sanitizeShareLinksPatch =
                 addInstructionsWithLabels(
                     0,
                     """
+                    invoke-static {}, Lapp/morphe/extension/instagram/utils/Pref;->pikoDebugKillSwitch()Z
+                    move-result v0
+                    if-eqz v0, :piko_kfb_keep
                     invoke-static {p2}, $LOCAL_SHARE_LINK_CLASS->profileUrl(Ljava/lang/String;)Ljava/lang/Object;
                     move-result-object v0
                     if-eqz v0, :piko_kfb_keep
