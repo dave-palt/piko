@@ -8,24 +8,28 @@ package app.crimera.patches.instagram.misc.postTimestamp
 
 import app.morphe.patcher.Fingerprint
 
-// Reels caption component builder #1 (IG 435: X/Xu2). The public A0i method
-// logs "is_reels_caption_expanded" right after reading the 6xB.A2j flag; the
-// private A01 sibling renders the timestamp row (gated on A2j in stock).
+// Reels caption component builder #1 (IG 435: X/Xu2; 439: X/04LW, classes5).
+// The public builder method logs "is_reels_caption_expanded" right after
+// reading the caption-expanded flag; the private render sibling renders the
+// timestamp row (gated on that flag in stock).
+// 435: method A0i, fields 1Mq/1j0. 439: method A0o, field 02Bb (holder)
+// and 00RR (clips media wrapper).
 internal object ReelsCaptionXu2Fingerprint : Fingerprint(
     strings = listOf("is_reels_caption_expanded"),
     custom = { methodDef, classDef ->
-        methodDef.name == "A0i" &&
-            classDef.fields.any { it.name == "A08" && it.type == "LX/1Mq;" }
+        methodDef.name == "A0o" &&
+            classDef.fields.any { it.name == "A00" && it.type == "LX/02Bb;" }
     },
 )
 
-// Reels caption component builder #2 (IG 435: X/2SY). Same anchor string as
-// Xu2; disambiguated by its 1j0 (ClipsMediaWrapper) field.
+// Reels caption component builder #2 (IG 435: X/2SY; 439: X/0TXO, classes15).
+// Same anchor string; disambiguated by its clips-media-wrapper field
+// (435: 1j0, 439: 02Ep).
 internal object ReelsCaption2SYFingerprint : Fingerprint(
     strings = listOf("is_reels_caption_expanded"),
     custom = { methodDef, classDef ->
-        methodDef.name == "A0i" &&
-            classDef.fields.any { it.name == "A01" && it.type == "LX/1j0;" }
+        methodDef.name == "A0o" &&
+            classDef.fields.any { it.name == "A08" && it.type == "LX/02Ep;" }
     },
 )
 
@@ -42,9 +46,10 @@ internal object FeedHeaderSubtitleListFingerprint : Fingerprint(
 )
 
 // Barcelona PostHeaderUsername composable (feed + reels post header). The
-// if-nez v17 branch at the 135.A0M call picks between the flow-row (username
-// + timestamp) and the inline path (username only when K4g.A04 is set).
+// branch after the layout-picker call picks between the flow-row (username
+// + timestamp) and the inline path (username only).
+// 435: PostHeaderUsername.kt:41; 439: PostHeaderUsername.kt:44.
 internal object PostHeaderUsernameFingerprint : Fingerprint(
-    strings = listOf("com.instagram.barcelona.feed.post.ui.PostHeaderUsername (PostHeaderUsername.kt:41)"),
+    strings = listOf("com.instagram.barcelona.feed.post.ui.PostHeaderUsername (PostHeaderUsername.kt:44)"),
     returnType = "V",
 )
