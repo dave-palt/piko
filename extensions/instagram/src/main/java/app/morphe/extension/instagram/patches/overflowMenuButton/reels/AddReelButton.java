@@ -97,9 +97,9 @@ public class AddReelButton {
         AddReelButton.addReelButton(context,reelOverflowButton,helperObject);
     }
 
-    private static void addCopyMediaLinkButton(Context context, Object helperObject, Object mediaObject){
+    private static void addCopyMediaLinkButton(Context context, Object helperObject, Object mediaObject, int currentMediaIndex){
         String icon = UI.DRAWABLE_LINK_ICON;
-        ReelButton reelButton = new CopyMediaLinkButton(context,mediaObject);
+        ReelButton reelButton = new CopyMediaLinkButton(context, mediaObject, currentMediaIndex);
         String buttonText = str("piko_copy_media_link");
 
         ReelOverflowButton reelOverflowButton = new ReelOverflowButton(icon,reelButton,buttonText);
@@ -119,7 +119,7 @@ public class AddReelButton {
             AddReelButton.addExternalDownloadButton(context, helperObject, mediaObject, currentMediaIndex);
         }
         if(Pref.copyMediaLink()){
-            AddReelButton.addCopyMediaLinkButton(context, helperObject, mediaObject);
+            AddReelButton.addCopyMediaLinkButton(context, helperObject, mediaObject, currentMediaIndex);
         }
         if(Pref.moreOptionsOnPost()){
             AddReelButton.addInfoButton(context, helperObject, mediaObject, currentMediaIndex);
