@@ -9,31 +9,34 @@ package app.crimera.patches.instagram.misc.metaai
 import app.morphe.patcher.Fingerprint
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 
-// DM inbox search bar (com.instagram.direct.inbox.feature.searchbar.ui.SearchBar).
+// DM inbox search bar (instagram.features.direct.inbox.feature.searchbar.ui.SearchBar).
 // The Meta AI variant of the search bar is driven by the state object built
 // from 64-bit MobileConfig params (Gbn.A01 / GAI.A03); its A08 boolean
 // ("compose the Meta AI button/icon") is read in three composables. Note the
 // flag-hook kills do NOT cover this surface: those flow through the integer
 // flags in HookFlags, while this gate comes from MobileConfigUnsafeContext.
+// 435: com.instagram.direct... / MetaAiCustomActionButton at SearchBar.kt:464
+// 439: instagram.features.direct... / MetaAiCustomActionButton at SearchBar.kt:463
 internal object SearchBarContentFingerprint : Fingerprint(
-    strings = listOf("com.instagram.direct.inbox.feature.searchbar.ui.SearchBarContent (SearchBar.kt:119)"),
+    strings = listOf("instagram.features.direct.inbox.feature.searchbar.ui.SearchBarContent (SearchBar.kt:119)"),
     returnType = "V",
 )
 
 internal object SearchBarIconFingerprint : Fingerprint(
-    strings = listOf("com.instagram.direct.inbox.feature.searchbar.ui.SearchBarIcon (SearchBar.kt:212)"),
+    strings = listOf("instagram.features.direct.inbox.feature.searchbar.ui.SearchBarIcon (SearchBar.kt:212)"),
     returnType = "V",
 )
 
 internal object MetaAiCustomActionButtonFingerprint : Fingerprint(
-    strings = listOf("com.instagram.direct.inbox.feature.searchbar.ui.MetaAiCustomActionButton (SearchBar.kt:464)"),
+    strings = listOf("instagram.features.direct.inbox.feature.searchbar.ui.MetaAiCustomActionButton (SearchBar.kt:463)"),
     returnType = "V",
 )
 
 // DM inbox search overlay result row (classic RecyclerView binder, not compose).
-// Reads the same 5Bu.A08 gate to decide whether to bind the "Ask Meta AI" row.
-// Several bindView methods share the logging string, so also require the
-// A08 gate read inside the implementation to pin the right class.
+// Reads the same A08 gate (435: LX/5Bu;, 439: LX/08Up;) to decide whether to
+// bind the "Ask Meta AI" row. Several bindView methods share the logging
+// string, so also require an A08 boolean-field read inside the implementation
+// to pin the right class.
 internal object MetaAiSearchRowFingerprint : Fingerprint(
     strings = listOf("Required value was null."),
     custom = { methodDef, _ ->
@@ -42,7 +45,7 @@ internal object MetaAiSearchRowFingerprint : Fingerprint(
                 (inst as? ReferenceInstruction)
                     ?.reference
                     ?.toString()
-                    ?.contains("LX/5Bu;->A08:Z") == true
+                    ?.matches(Regex("LX/\\w+;->A08:Z")) == true
             } == true
     },
 )
