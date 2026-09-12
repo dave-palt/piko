@@ -56,6 +56,24 @@ private fun MutableMethod.forceGateAt(branchIndex: Int) {
     )
 }
 
+/**
+ * Same as [forceGateAt] but with a caller-supplied scratch register for
+ * mega-methods where morphe's liveness scan gives up (e.g. the 439 classic
+ * feed header builder: ~100 locals, fully packed register file). The caller
+ * must have verified the scratch dead across the injection point.
+ */
+private fun MutableMethod.forceGateWithScratch(branchIndex: Int, scratchReg: Int) {
+    val gateReg = getInstruction(branchIndex).registersUsed[0]
+    addInstructions(
+        branchIndex,
+        """
+        $PREF_CALL_DESCRIPTOR->showPostTimestamp()Z
+        move-result v$scratchReg
+        or-int v$gateReg, v$gateReg, v$scratchReg
+        """.trimIndent(),
+    )
+}
+
 @Suppress("unused")
 val postTimestampPatch =
     bytecodePatch(
@@ -222,13 +240,18 @@ val postTimestampPatch =
                         }.map { it.index }
                 if (gateCalls.isEmpty()) error("time-gate call not found in feed header subtitle list builder")
 
-                // Each call is followed by move-result vN + if-eqz vN — force
-                // from the last site backwards so indices stay valid.
+                // Each call is followed by move-result vN + if-eqz vN. Scratch
+                // registers are dead per-site (verified against the 439 smali):
+                // the time-holder v0 gate sites have v5 dead, and the v5 gate
+                // site (tail) has v6 dead. morphe's findFreeRegister gives up
+                // on this fully-packed ~100-local mega-method.
                 gateCalls.map { it + 1 }.sortedDescending().forEach { moveResultIndex ->
                     if (instructions[moveResultIndex].opcode != Opcode.MOVE_RESULT) {
                         error("time-gate call not followed by move-result")
                     }
-                    forceGateAt(moveResultIndex)
+                    val gateReg = getInstruction(moveResultIndex + 1).registersUsed[0]
+                    val scratch = if (gateReg == 5) 6 else 5
+                    forceGateWithScratch(moveResultIndex + 1, scratch)
                 }
             }
 
