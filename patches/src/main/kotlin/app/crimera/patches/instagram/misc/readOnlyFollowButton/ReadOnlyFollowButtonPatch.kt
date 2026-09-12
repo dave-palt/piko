@@ -49,27 +49,46 @@ val readOnlyFollowButtonPatch =
         execute {
             // ---- Site 1: Vgs.A01 (barcelona FollowButton, feed + reels) ----
             FollowButtonFingerprint.method.apply {
-                val nullCheckIndex =
+                // The onClick Function0 (p4) is moved into vN in the prologue and
+                // immediately null-checked by a shared kotlin-intrinsics helper
+                // (435: 3l9.A0R, 439: 04l9.A0g — both `(Ljava/lang/Object;)V`).
+                // Anchor on that first null-check of the moved p4 instead of the
+                // helper's obfuscated name.
+                val p4MoveIndex =
                     instructions.indexOfFirst {
-                        it.opcode == Opcode.INVOKE_STATIC_RANGE &&
-                            it.getReference<MethodReference>()?.let { ref ->
-                                ref.definingClass == "LX/3l9;" && ref.name == "A0R"
-                            } == true
+                        it.opcode == Opcode.MOVE_OBJECT_FROM16
                     }
-                if (nullCheckIndex == -1) error("3l9.A0R null-check not found in FollowButton")
+                if (p4MoveIndex == -1) error("p4 prologue move not found in FollowButton")
 
-                // Inserted before the null-check: when the toggle is on, v30
-                // (the onClick) is replaced by the shared no-op lambda (v30 >
-                // v15, so range form). The null-check then validates the
-                // replacement and execution continues unchanged.
+                val onClickReg = getInstruction(p4MoveIndex).registersUsed[0]
+
+                val nullCheckIndex =
+                    instructions.withIndex()
+                        .drop(p4MoveIndex + 1)
+                        .firstOrNull { (_, ins) ->
+                            ins.opcode == Opcode.INVOKE_STATIC_RANGE &&
+                                ins.getReference<MethodReference>()?.let { ref ->
+                                    // null-check helper shape: single Object param, void return
+                                    ref.parameterTypes.size == 1 &&
+                                        ref.parameterTypes[0].toString() == "Ljava/lang/Object;" &&
+                                        ref.returnType == "V"
+                                } == true
+                        }?.index
+                        ?: error("Function0 null-check not found after p4 move in FollowButton")
+
+                // Inserted before the null-check: when the toggle is on, the
+                // onClick register is replaced by the shared no-op lambda. The
+                // null-check then validates the replacement and execution
+                // continues unchanged. (435: v30 > v15 so range form; 439 keeps
+                // the same shape.)
                 addInstructionsWithLabels(
                     nullCheckIndex,
                     """
                     $PREF_CALL_DESCRIPTOR->readOnlyFollowButton()Z
                     move-result v2
                     if-eqz v2, :piko_vgs_keep
-                    invoke-static/range {v30 .. v30}, $NOOP_FUNCTION0_CLASS->noop(Ljava/lang/Object;)Ljava/lang/Object;
-                    move-result-object v30
+                    invoke-static/range {v$onClickReg .. v$onClickReg}, $NOOP_FUNCTION0_CLASS->noop(Ljava/lang/Object;)Ljava/lang/Object;
+                    move-result-object v$onClickReg
                     """.trimIndent(),
                     ExternalLabel("piko_vgs_keep", getInstruction(nullCheckIndex)),
                 )
@@ -77,52 +96,77 @@ val readOnlyFollowButtonPatch =
 
             // ---- Site 2: WkD.A02 (IGDS FollowButtonComponent) ----
             IgdsFollowButtonComponentFingerprint.method.apply {
+                // The wide static call that consumes the onClick Function0
+                // (435: D4K.A01, 439: 0CSf.A01 — both 9-arg range calls whose
+                // 5th arg is the Function0). Found by shape: INVOKE_STATIC_RANGE
+                // whose param list contains kotlin Function0.
                 val d4kCallIndex =
-                    instructions.indexOfFirst {
-                        it.opcode == Opcode.INVOKE_STATIC_RANGE &&
-                            it.getReference<MethodReference>()?.let { ref ->
-                                ref.definingClass == "LX/D4K;" && ref.name == "A01"
-                            } == true
-                    }
-                if (d4kCallIndex == -1) error("D4K.A01 call not found in FollowButtonComponent")
+                    instructions.withIndex()
+                        .firstOrNull { (_, ins) ->
+                            ins.opcode == Opcode.INVOKE_STATIC_RANGE &&
+                                ins.getReference<MethodReference>()?.let { ref ->
+                                    ref.parameterTypes.any { it.toString() == "Lkotlin/jvm/functions/Function0;" }
+                                } == true
+                        }?.index
+                        ?: error("Function0-consuming static call not found in FollowButtonComponent")
+
+                // onClick rides in v10 (5th arg of v6..v14) in both 435 and 439 —
+                // derived from the call's own register range.
+                val firstReg =
+                    getInstruction(d4kCallIndex).registersUsed.first()
+                val f0Index = run {
+                    val ref = getInstruction(d4kCallIndex).getReference<MethodReference>()!!
+                    ref.parameterTypes.indexOfFirst { it.toString() == "Lkotlin/jvm/functions/Function0;" }
+                }
+                val onClickReg = firstReg + f0Index
+
+                // Scratch register dead at the call site on every path:
+                // 435 used v3; 439's pre-call code recomputes v3 (0AsH.A0D args),
+                // so use v2 (written once at goto_0, consumed by the 0DVb memo
+                // key, dead through the call; no refs after it either).
+                val scratchReg = 2
 
                 // Inserted immediately before the consuming call so the memo
-                // path's reassignment of v10 cannot resurrect the real
-                // handler. Scratch v3: outside the {v6..v14} call range and
-                // dead here (next touch is the write at goto_69's
-                // move-result-object v3). v10 <= v15 so plain invoke-static.
+                // path's reassignment of the onClick register cannot resurrect
+                // the real handler.
                 addInstructionsWithLabels(
                     d4kCallIndex,
                     """
                     $PREF_CALL_DESCRIPTOR->readOnlyFollowButton()Z
-                    move-result v3
-                    if-eqz v3, :piko_wkd_keep
-                    invoke-static {v10}, $NOOP_FUNCTION0_CLASS->noop(Ljava/lang/Object;)Ljava/lang/Object;
-                    move-result-object v10
+                    move-result v$scratchReg
+                    if-eqz v$scratchReg, :piko_wkd_keep
+                    invoke-static {v$onClickReg}, $NOOP_FUNCTION0_CLASS->noop(Ljava/lang/Object;)Ljava/lang/Object;
+                    move-result-object v$onClickReg
                     """.trimIndent(),
                     ExternalLabel("piko_wkd_keep", getInstruction(d4kCallIndex)),
                 )
             }
 
-            // ---- Site 3: 5b5.A05 (classic Litho/view wiring chokepoint) ----
+            // ---- Site 3: 07eP.A05 (classic view wiring chokepoint) ----
             // The home-feed inline_follow_button is NOT compose — its click
-            // listener is attached in 5b5.A05 at two 0es.A00(listener, view)
-            // calls: the primary site (:cond_97, listener v11 = custom field
-            // A00 or the default 5bJ follow action) and an experimental-gated
-            // variant (LLj, listener v0). Patch EVERY attach call, reading the
-            // listener register from each instruction itself. Both registers
-            // are dead across their calls; v0/v11 <= v15 so plain forms.
+            // listener is attached in the follow-button controller's wiring
+            // method at 003D.A00(listener, view) calls: the primary site
+            // (listener v11 = custom field A00 or the default 07hW follow
+            // action), an experimental-gated variant (0JnG), and a long-click
+            // listener. Patch EVERY attach call, reading the listener register
+            // from each instruction itself. Listener regs <= v15 so plain forms.
             ViewFollowButtonWiringFingerprint.method.apply {
+                // Attach helper rotates between versions (435: 0es.A00, 439:
+                // 003D.A00) — find it by shape: static invoke whose first param
+                // is View$OnClickListener and last is View.
                 val attachSites =
                     instructions.withIndex()
                         .filter { (_, ins) ->
                             ins.opcode == Opcode.INVOKE_STATIC &&
                                 ins.getReference<MethodReference>()?.let { ref ->
-                                    ref.definingClass == "LX/0es;" && ref.name == "A00"
+                                    ref.parameterTypes.size == 2 &&
+                                        ref.parameterTypes[0].toString() == "Landroid/view/View${'$'}OnClickListener;" &&
+                                        ref.parameterTypes[1].toString() == "Landroid/view/View;" &&
+                                        ref.returnType == "V"
                                 } == true
                         }
                         .map { (i, ins) -> i to ins.registersUsed.first() }
-                if (attachSites.isEmpty()) error("0es.A00 attach call not found in 5b5.A05")
+                if (attachSites.isEmpty()) error("OnClickListener attach call not found in wiring method")
 
                 attachSites.sortedByDescending { it.first }.forEach { (idx, reg) ->
                     addInstructions(

@@ -14,11 +14,19 @@ import app.crimera.patches.instagram.utils.Constants.EDIT_MEDIA_INFO_FRAGMENT_CL
 import app.crimera.patches.instagram.utils.Constants.ORIGINAL_SOUND_DATA_INTF
 import app.crimera.patches.instagram.utils.Constants.USER_SESSION_CLASS
 import app.morphe.patcher.Fingerprint
-import com.android.tools.smali.dexlib2.AccessFlags
+import com.android.tools.smali.dexlib2.iface.Method
 
 internal const val AUDIO_SRC_KEY = "audio_src"
 internal const val EXTENSION_CLASS_DESCRIPTOR = "${Constants.ENTITY_CLASS}/MediaData;"
-internal const val VIDEO_INFO_MAPPER_KEY = "video_to_carousel_cut_info"
+internal const val LIVE_TREE_MEDIA_DICT_CLASS = "Lcom/instagram/feed/media/LiveTreeMediaDict;"
+
+/**
+ * Class carrying the LiveTree-backed media getters. Both candidates ship together, so
+ * `mediaDataEntity` pins one before these fingerprints resolve.
+ */
+internal var mediaModelClass: String = LIVE_TREE_MEDIA_DICT_CLASS
+
+private fun Method.inMediaModel(): Boolean = definingClass == mediaModelClass
 
 internal object GetHelperClassExtensionFingerprint : Fingerprint(
     definingClass = EXTENSION_CLASS_DESCRIPTOR,
@@ -107,11 +115,6 @@ internal object GetPostTypeExtensionFingerprint : Fingerprint(
 
 // -----------------------------------
 
-internal object ReelsMentionDoubleTapFingerprint : Fingerprint(
-    returnType = "V",
-    strings = listOf("userSession", "direct_add_mention_tap"),
-)
-
 internal object InstagramMainActivityNotificationRelatedFingerprint : Fingerprint(
     definingClass = "/InstagramMainActivity;",
     strings = listOf("nme_ig_post_post_creation_notif", "nme_ig_post_story_creation_notif"),
@@ -144,51 +147,30 @@ internal object FanClubContentPreviewInteractorImplFingerprint : Fingerprint(
     strings = listOf("subscription_exclusive_content_public_preview_select", "creator_igid"),
 )
 
-internal object DirectShareTargetRelatedFingerprint : Fingerprint(
-    returnType = "V",
-    strings = listOf("", "https://www.instagram.com/p/"),
-    custom = { methodDef, _ ->
-        methodDef.parameters.size == 3 && methodDef.parameters.last().type == "Lcom/instagram/model/direct/DirectShareTarget;"
-    },
-)
-
-internal object GetDisplayArtistFromMusicInfoAndOriginalSoundDataFingerprint : Fingerprint(
-    returnType = "Ljava/lang/String;",
-    parameters = listOf("Lcom/instagram/api/schemas/MusicInfo;", ORIGINAL_SOUND_DATA_INTF),
-)
-
-internal object MusicAudioTypeEnumStringFingerprint : Fingerprint(
-    classFingerprint = GetDisplayArtistFromMusicInfoAndOriginalSoundDataFingerprint,
-    returnType = "Ljava/lang/String;",
-    parameters = listOf("Landroid/content/Context;", USER_SESSION_CLASS, MEDIA_CLASS_NAME),
-    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.STATIC, AccessFlags.FINAL),
-)
-
 internal object AudioIntfMapperFingerprint : Fingerprint(
     returnType = "Ljava/util/Map;",
     strings = listOf(AUDIO_SRC_KEY, "audio_src_expiration_timestamp_us", "codec", "duration", "fallback", "file_format"),
-)
-
-internal object IgPlayerControllerRelatedFingerprint : Fingerprint(
-    strings =
-        listOf(
-            "igPlayerController must be initialized",
-            "audioMetadata must be set before preparing",
-        ),
 )
 
 internal object ExtMediaDictVideoInfoMapperFingerprint : Fingerprint(
     strings =
         listOf(
             "video_subtitles_uri",
-            VIDEO_INFO_MAPPER_KEY,
+            "video_to_carousel_cut_info",
         ),
     returnType = "Ljava/util/Map;",
 )
 
-internal object LiveTreeMediaDictClinitFingerprint : Fingerprint(
-    name = "<clinit>",
-    strings = listOf(VIDEO_INFO_MAPPER_KEY),
+internal object LiveTreeMediaDictReelsMentionFingerprint : Fingerprint(
+    returnType = "Ljava/util/List;",
+    strings = listOf("reel_mentions"),
+    custom = { methodDef, _ -> methodDef.inMediaModel() },
+)
+
+internal object LiveTreeMediaDictGetUserFingerprint : Fingerprint(
+    returnType = USER_MODEL_CLASS_NAME,
+    strings = listOf("user"),
+    custom = { methodDef, _ -> methodDef.inMediaModel() },
 )
 
 internal object ExtMediaDictImageInfoMapperFingerprint : Fingerprint(
@@ -230,4 +212,9 @@ internal object GetUserDataFromMediaFingerprint : Fingerprint(
     classFingerprint = ReelsInlineQualitySurveyRelatedFingerprint,
     parameters = listOf(USER_SESSION_CLASS, MEDIA_CLASS_NAME),
     returnType = USER_MODEL_CLASS_NAME,
+)
+
+internal object CommentToStringFingerprint : Fingerprint(
+    name = "toString",
+    strings = listOf("Comment{mCreatedAtSeconds=%d, mUser=@%s, mText=\'%s\'}"),
 )

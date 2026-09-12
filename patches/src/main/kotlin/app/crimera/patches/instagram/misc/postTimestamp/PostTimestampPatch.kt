@@ -9,6 +9,7 @@ package app.crimera.patches.instagram.misc.postTimestamp
 import app.crimera.patches.instagram.misc.settings.settingsPatch
 import app.crimera.patches.instagram.utils.Constants.COMPATIBILITY_INSTAGRAM
 import app.crimera.patches.instagram.utils.Constants.PREF_CALL_DESCRIPTOR
+import app.crimera.patches.instagram.utils.Constants.USER_SESSION_CLASS
 import app.crimera.patches.instagram.utils.enableSettings
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
@@ -55,6 +56,24 @@ private fun MutableMethod.forceGateAt(branchIndex: Int) {
     )
 }
 
+/**
+ * Same as [forceGateAt] but with a caller-supplied scratch register for
+ * mega-methods where morphe's liveness scan gives up (e.g. the 439 classic
+ * feed header builder: ~100 locals, fully packed register file). The caller
+ * must have verified the scratch dead across the injection point.
+ */
+private fun MutableMethod.forceGateWithScratch(branchIndex: Int, scratchReg: Int) {
+    val gateReg = getInstruction(branchIndex).registersUsed[0]
+    addInstructions(
+        branchIndex,
+        """
+        $PREF_CALL_DESCRIPTOR->showPostTimestamp()Z
+        move-result v$scratchReg
+        or-int v$gateReg, v$gateReg, v$scratchReg
+        """.trimIndent(),
+    )
+}
+
 @Suppress("unused")
 val postTimestampPatch =
     bytecodePatch(
@@ -65,17 +84,22 @@ val postTimestampPatch =
         compatibleWith(COMPATIBILITY_INSTAGRAM)
 
         execute {
-            // Home feed: force K4g.A05=true after the stock iput so the
-            // timestamp renders beside the username.
+            // Home feed: force the header-state timestamp gate after the stock
+            // iput so the timestamp renders beside the username. The state class
+            // rotates between versions (435: K4g.A05, 439: 0J2P.A05) — resolved
+            // dynamically from the single boolean-field iput whose value is the
+            // 0224.A1T gate result (439) / equivalent computed gate (435).
             PostHeaderUsernameFlowRowFingerprint.method.apply {
                 val iputIndex =
                     instructions.indexOfFirst {
                         it.opcode == Opcode.IPUT_BOOLEAN &&
                             it.getReference<FieldReference>()?.let { ref ->
-                                ref.definingClass == "LX/K4g;" && ref.name == "A05"
+                                ref.name == "A05"
                             } == true
                     }
-                if (iputIndex == -1) error("K4g.A05 iput not found in post header builder")
+                if (iputIndex == -1) error("A05 timestamp-gate iput not found in post header builder")
+
+                val stateReg = getInstruction(iputIndex).registersUsed[1]
 
                 // Idempotent force-true inserted after the stock iput: when
                 // the toggle is on, A05 is (re)written with true so the
@@ -86,52 +110,59 @@ val postTimestampPatch =
                     $PREF_CALL_DESCRIPTOR->showPostTimestamp()Z
                     move-result v2
                     if-eqz v2, :piko_ts_skip
-                    iput-boolean v2, v3, LX/K4g;->A05:Z
+                    iput-boolean v2, v$stateReg, ${getInstruction(iputIndex).getReference<FieldReference>()!!.definingClass}->A05:Z
                     """.trimIndent(),
                     ExternalLabel("piko_ts_skip", getInstruction(iputIndex + 1)),
                 )
             }
 
-            // Home feed: when the secondary line (music attribution, K4g.A04)
-            // is present, stock picks the inline layout that drops the time
-            // row (v17 == 0 at the branch after the 135.A0M call). Force the
-            // flow-row path; the music line renders via the common tail in
-            // both branches.
-            PostHeaderUsernameFingerprint.method.apply {
-                val a0mIndex =
-                    instructions.indexOfFirst {
-                        it.opcode == Opcode.INVOKE_STATIC &&
-                            it.getReference<MethodReference>()?.let { ref ->
-                                ref.definingClass == "LX/135;" && ref.name == "A0M"
-                            } == true
-                    }
-                if (a0mIndex == -1) error("135.A0M call not found in PostHeaderUsername")
+            // Home feed layout picker (435 only): when the secondary line
+            // (music attribution) was present, stock picked the inline layout
+            // that drops the time row. In 439 the PostHeaderUsername composable
+            // builds the flow-row node UNCONDITIONALLY (single 0fwn ctor, no
+            // alternate inline node), so this site is obsolete — the A05 gate
+            // (site 1) alone decides whether the time row renders (0Wkq.A00
+            // reads it). Kept as a no-op for history; re-enable if IG brings
+            // back a two-layout header.
+            if (false) {
+                PostHeaderUsernameFingerprint.method.apply {
+                    val a0mIndex =
+                        instructions.indexOfFirst {
+                            it.opcode == Opcode.INVOKE_STATIC &&
+                                it.getReference<MethodReference>()?.let { ref ->
+                                    ref.definingClass == "LX/135;" && ref.name == "A0M"
+                                } == true
+                        }
+                    if (a0mIndex == -1) error("135.A0M call not found in PostHeaderUsername")
 
-                var branchIndex = -1
-                for (i in a0mIndex + 1 until minOf(a0mIndex + 7, instructions.size)) {
-                    if (instructions[i].opcode == Opcode.IF_NEZ) {
-                        branchIndex = i
-                        break
+                    var branchIndex = -1
+                    for (i in a0mIndex + 1 until minOf(a0mIndex + 7, instructions.size)) {
+                        if (instructions[i].opcode == Opcode.IF_NEZ) {
+                            branchIndex = i
+                            break
+                        }
                     }
+                    if (branchIndex == -1) error("layout branch after 135.A0M not found")
+                    forceGateAt(branchIndex)
                 }
-                if (branchIndex == -1) error("layout branch after 135.A0M not found")
-                forceGateAt(branchIndex)
             }
 
             // Reels: the timestamp row lives in the caption component and is
-            // gated on the caption-expanded flag (6xB.A2j). Force those gate
-            // branches so the row renders while the caption is collapsed.
+            // gated on the caption-expanded flag (435: 6xB.A2j; 439: 00R5.A2n).
+            // Force those gate branches so the row renders while the caption
+            // is collapsed.
+            // 439 render methods: 04LW.A02(0AsI)03Wk, 0TXO.A01(0AsI)03Wk.
             listOf(
-                Triple(ReelsCaptionXu2Fingerprint, "A01", "LX/Xu2;"),
-                Triple(ReelsCaption2SYFingerprint, "A02", "LX/2SY;"),
+                Triple(ReelsCaptionXu2Fingerprint, "A02", "LX/04LW;"),
+                Triple(ReelsCaption2SYFingerprint, "A01", "LX/0TXO;"),
             ).forEach { (fingerprint, renderName, definingClass) ->
-                // The render method itself: its A2j read is immediately
-                // followed by the gate branch.
+                // The render method itself: its caption-expanded read is
+                // immediately followed by the gate branch.
                 fingerprint.classDef.methods
                     .first {
                         it.name == renderName &&
-                            it.parameterTypes == listOf("LX/J3H;") &&
-                            it.returnType == "LX/2Yc;"
+                            it.parameterTypes == listOf("LX/0AsI;") &&
+                            it.returnType == "LX/03Wk;"
                     }
                     .apply {
                         val gateBranches =
@@ -139,21 +170,27 @@ val postTimestampPatch =
                                 .filter { (i, insn) ->
                                     insn.opcode == Opcode.IGET_BOOLEAN &&
                                         insn.getReference<FieldReference>()?.let { ref ->
-                                            ref.definingClass == "LX/6xB;" && ref.name == "A2j"
+                                            // caption-expanded flag holder rotates
+                                            // (435: 6xB, 439: 00R5); field name A2j/A2n.
+                                            ref.name.startsWith("A2") && ref.type == "Z"
                                         } == true &&
                                         i + 1 < instructions.size &&
                                         instructions[i + 1].opcode == Opcode.IF_EQZ
                                 }
                                 .map { it.index + 1 }
-                        if (gateBranches.isEmpty()) error("no A2j gate branch in $definingClass.$renderName")
+                        if (gateBranches.isEmpty()) error("no caption-expanded gate branch in $definingClass.$renderName")
 
-                        gateBranches.sortedDescending().forEach { forceGateAt(it) }
+                        // Reels render + builder methods keep a fully-packed
+                        // low register file (17-18 locals); morphe's liveness
+                        // scan fails. v7 is dead at the gate sites in both
+                        // render methods (verified against 439 smali).
+                        gateBranches.sortedDescending().forEach { forceGateWithScratch(it, 7) }
                     }
 
-                // The public builder (A0i, the fingerprinted method) guards
+                // The public builder (A0o, the fingerprinted method) guards
                 // its render invocations behind the same flag. For every
                 // self-invoke of the render method, walk back through the
-                // gate chain and force the outermost (A2j) branch.
+                // gate chain and force the outermost branch.
                 fingerprint.method.apply {
                     val renderInvokes =
                         instructions.withIndex()
@@ -162,7 +199,7 @@ val postTimestampPatch =
                                     insn.getReference<MethodReference>()?.let { ref ->
                                         ref.definingClass == definingClass &&
                                             ref.name == renderName &&
-                                            ref.parameterTypes == listOf("LX/J3H;")
+                                            ref.parameterTypes == listOf("LX/0AsI;")
                                     } == true
                             }
                             .map { it.index }
@@ -178,50 +215,50 @@ val postTimestampPatch =
                             gateIdx
                         }.distinct()
 
-                    gateBranches.sortedDescending().forEach { forceGateAt(it) }
+                    // Builder-side gates: v9 dead at both render-invoke
+                    // gate windows in both builders (verified 439 smali).
+                    gateBranches.sortedDescending().forEach { forceGateWithScratch(it, 9) }
                 }
             }
 
-            // Classic (Litho) home-feed header: stock skips the entire
-            // timestamp section when the media has audio attribution
-            // (6dA.A0Q -> v64), which is why music posts hide the date.
-            // Conditionally zero the skip flag behind the toggle (OR-forcing
-            // would do the opposite here: the branch skips when non-zero);
-            // the timestamp entry then always joins the subtitle list
-            // alongside the music attribution.
+            // Classic (Litho) home-feed header (439): every subtitle-list path
+            // converges on a common tail that consults
+            // 00q2.A01(session, timeHolder)Z — true adds the timestamp entry
+            // (00u5.A0B) if absent. The 435 audio-attribution skip branch no
+            // longer exists; OR-forcing the A01 result at every site makes
+            // the timestamp entry always join the list (music attribution
+            // stays). OFF path ORs in 0 = stock byte-for-byte.
             FeedHeaderSubtitleListFingerprint.method.apply {
-                val a0qIndex = instructions.indexOfFirst {
-                    it.opcode == Opcode.INVOKE_STATIC &&
-                        it.getReference<MethodReference>()?.let { ref ->
-                            ref.definingClass == "LX/6dA;" && ref.name == "A0Q"
-                        } == true
-                }
-                if (a0qIndex == -1) error("6dA.A0Q call not found in feed header subtitle list builder")
+                val gateCalls =
+                    instructions.withIndex()
+                        .filter { (_, insn) ->
+                            insn.opcode == Opcode.INVOKE_STATIC &&
+                                insn.getReference<MethodReference>()?.let { ref ->
+                                    // "should show time beside username" gate:
+                                    // (UserSession, timeHolder)Z — 439: 00q2.A01,
+                                    // resolved by shape (2 params, 2nd is the
+                                    // 00rQ.A01() time-holder type, Z return).
+                                    ref.parameterTypes.size == 2 &&
+                                        ref.parameterTypes[0].toString() == USER_SESSION_CLASS &&
+                                        ref.parameterTypes[1].toString() == "LX/00t1;" &&
+                                        ref.returnType == "Z"
+                                } == true
+                        }.map { it.index }
+                if (gateCalls.isEmpty()) error("time-gate call not found in feed header subtitle list builder")
 
-                val skipReg =
-                    (getInstruction(a0qIndex + 1) as? Instruction11x)?.registerA
-                        ?: error("no move-result after 6dA.A0Q")
-                var branchIndex = -1
-                for (i in a0qIndex + 2 until instructions.size) {
-                    val insn = instructions[i]
-                    if (insn.opcode == Opcode.IF_NEZ && insn.registersUsed[0] == skipReg) {
-                        branchIndex = i
-                        break
+                // Each call is followed by move-result vN + if-eqz vN. Scratch
+                // registers are dead per-site (verified against the 439 smali):
+                // the time-holder v0 gate sites have v5 dead, and the v5 gate
+                // site (tail) has v6 dead. morphe's findFreeRegister gives up
+                // on this fully-packed ~100-local mega-method.
+                gateCalls.map { it + 1 }.sortedDescending().forEach { moveResultIndex ->
+                    if (instructions[moveResultIndex].opcode != Opcode.MOVE_RESULT) {
+                        error("time-gate call not followed by move-result")
                     }
+                    val gateReg = getInstruction(moveResultIndex + 1).registersUsed[0]
+                    val scratch = if (gateReg == 5) 6 else 5
+                    forceGateWithScratch(moveResultIndex + 1, scratch)
                 }
-                if (branchIndex == -1) error("audio-attribution skip branch after 6dA.A0Q not found")
-
-                val gateReg = skipReg
-                addInstructionsWithLabels(
-                    branchIndex,
-                    """
-                    $PREF_CALL_DESCRIPTOR->showPostTimestamp()Z
-                    move-result v0
-                    if-eqz v0, :piko_ts_audio_skip
-                    const/16 v$gateReg, 0x0
-                    """.trimIndent(),
-                    ExternalLabel("piko_ts_audio_skip", getInstruction(branchIndex)),
-                )
             }
 
             enableSettings("showPostTimestamp")

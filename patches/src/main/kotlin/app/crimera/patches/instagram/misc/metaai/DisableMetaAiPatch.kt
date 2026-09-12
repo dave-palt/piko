@@ -26,26 +26,31 @@ import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 
 /**
- * Neutralizes the `iget-boolean <gate>, <obj>, LX/5Bu;->A08:Z` read ("compose
+ * Neutralizes the `iget-boolean <gate>, <obj>, <gateClass>->A08:Z` read ("compose
  * the Meta AI search-bar button/icon") in a search-bar composable. The gate
  * register is dead right before the stock read (the iget overwrites it), so
  * no scratch register is needed: with the toggle on, the gate register is
  * zeroed and the stock read is skipped, making the following stock branch
  * take the no-Meta-AI path — identical to a user the feature is disabled
  * for. With the toggle off the stock read executes untouched.
+ *
+ * The gate's defining class is obfuscated and rotates between IG versions
+ * (435: LX/5Bu;, 439: LX/08Up;) — it is resolved from the matched method's
+ * own A08 boolean-field read instead of being pinned.
  */
 private fun MutableMethod.forceNoMetaAiButton() {
-    val igetIndex =
-        instructions.indexOfFirst {
-            it.opcode == Opcode.IGET_BOOLEAN &&
-                it.getReference<FieldReference>()?.let { ref ->
-                    ref.definingClass == "LX/5Bu;" && ref.name == "A08"
+    val gateRead =
+        instructions.withIndex().firstOrNull { (_, instruction) ->
+            instruction.opcode == Opcode.IGET_BOOLEAN &&
+                instruction.getReference<FieldReference>()?.let { ref ->
+                    ref.name == "A08"
                 } == true
-        }
-    if (igetIndex == -1) error("5Bu.A08 read not found in ${this.name}")
-    if (igetIndex + 1 >= instructions.size) error("no branch after 5Bu.A08 read in ${this.name}")
+        } ?: error("A08 boolean gate read not found in ${this.name}")
 
-    val gateReg = getInstruction(igetIndex).registersUsed[0]
+    val igetIndex = gateRead.index
+    if (igetIndex + 1 >= instructions.size) error("no branch after A08 gate read in ${this.name}")
+
+    val gateReg = gateRead.value.registersUsed[0]
 
     addInstructionsWithLabels(
         igetIndex,
@@ -99,7 +104,12 @@ val disableMetaAiPatch =
                         .filter {
                             it.opcode == Opcode.IGET_OBJECT &&
                                 it.getReference<FieldReference>()?.let { ref ->
-                                    ref.definingClass == "LX/2tK;" && ref.name == "A0G"
+                                    // Funnel class is obfuscated and rotates between
+                                    // versions (435: LX/2tK;, 439: LX/03u7;); the path
+                                    // field name A0G held on both. Pin by field name
+                                    // + String type within the fingerprint-matched
+                                    // funnel method.
+                                    ref.name == "A0G" && ref.type == "Ljava/lang/String;"
                                 } == true
                         }.map { it.location.index to it.registersUsed[0] }
 

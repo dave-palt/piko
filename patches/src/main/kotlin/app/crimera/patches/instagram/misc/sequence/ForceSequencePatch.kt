@@ -39,6 +39,7 @@ private const val REMIX_GATE_METHOD_NAME = "A0I"
 
 // Action sheet builder. "remix_prefetch" is logged only by the action-sheet
 // path of ClipsOrganicMediaItemViewMoreOptionsController (unique app-wide).
+// Verified on 439.0.0.37.89: X/01GJ.A07, gate = LX/02fZ;->A0I(LX/00RR;UserSession;)Z.
 internal object ClipsShowRemixingOptionsFingerprint : Fingerprint(
     strings =
         listOf(
@@ -46,14 +47,9 @@ internal object ClipsShowRemixingOptionsFingerprint : Fingerprint(
         ),
 )
 
-// Bottom sheet builder. "simplified_overflow_menu" appears only in the
-// reduced-options bottom-sheet path (unique app-wide).
-internal object ClipsMaybeAddRemixRowsFingerprint : Fingerprint(
-    strings =
-        listOf(
-            "simplified_overflow_menu",
-        ),
-)
+// 435's second surface ("simplified_overflow_menu" bottom-sheet builder) is
+// GONE in 439 — the string survives only inside the X/0000 string-lookup
+// table, no builder references it. Fingerprint removed accordingly.
 
 @Suppress("unused")
 val forceSequencePatch =
@@ -69,7 +65,7 @@ val forceSequencePatch =
         execute {
             var patchedGates = 0
 
-            listOf(ClipsShowRemixingOptionsFingerprint, ClipsMaybeAddRemixRowsFingerprint).forEach { fingerprint ->
+            listOf(ClipsShowRemixingOptionsFingerprint).forEach { fingerprint ->
                 fingerprint.method.apply {
                     val gateIndices =
                         instructions.withIndex()

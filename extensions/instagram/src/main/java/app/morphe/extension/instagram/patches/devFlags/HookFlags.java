@@ -5,7 +5,7 @@
  */
 
 
-package app.morphe.extension.instagram.patches;
+package app.morphe.extension.instagram.patches.devFlags;
 
 import java.util.Map;
 import java.util.HashMap;
@@ -15,10 +15,16 @@ import app.morphe.extension.crimera.PikoUtils;
 import app.morphe.extension.instagram.entity.DeveloperOptions;
 import app.morphe.extension.instagram.entity.DeveloperOptionsItem;
 import app.morphe.extension.instagram.utils.Pref;
+import app.morphe.extension.instagram.settings.SettingsStatus;
 
 public class HookFlags {
     private static Map<String, Boolean> BOOL_FLAGS = new HashMap<>();
     private static DeveloperOptions developerOptions = new DeveloperOptions();
+
+    // Upstream v3.9.0: disable-onboarding-prompts replaced the universal 56295 flag
+    // kill with a screen-level Bloks block (our fork28 b82b7349 already ported the
+    // same approach), so these universal kills stay OUT. Kept as reference only.
+    // See DisableOnboardingPermissionPromptsPatch + Links.shouldDisableOnboarding.
 
     private static void simpleOverflowMenuFlags() {
         BOOL_FLAGS.put("104772", false); //ig_ini
@@ -94,8 +100,6 @@ public class HookFlags {
         BOOL_FLAGS.put("79140", false);   //igd_gen_ai_craft_h2_2024
         BOOL_FLAGS.put("79677", false);   //igd_meta_ai_preemptive_prefetch
         BOOL_FLAGS.put("79859", false);   //ig_android_mai_imagine
-        BOOL_FLAGS.put("80171", false);   //odin_ig_android_metaai_ner
-        BOOL_FLAGS.put("80172", false);   //odin_ig_android_metaai_integrity
         BOOL_FLAGS.put("80654", false);   //ig_meta_ai_cdd_reels_viewer
         BOOL_FLAGS.put("80730", false);   //meta_ai_android_ig_intent_nux_key
         BOOL_FLAGS.put("82374", false);   //ig_android_genai_ai_filter
@@ -164,6 +168,8 @@ public class HookFlags {
         BOOL_FLAGS.put("94546::21", true);  //igd_android_inbox_search_experiments::remove_ask_meta_ai_prompts (positive-remove)
         BOOL_FLAGS.put("94598::135", false); //ig_search_client_multi_turn_search::is_android_large_ask_meta_ai_enabled
         BOOL_FLAGS.put("109855::26", true);  //direct_android_core_messaging_26h1::remove_ai_pill (positive-remove)
+        // Upstream v3.9.0 commented these two out (server-side dependent);
+        // our metaAiFlags() keeps them under the disable_meta_ai toggle instead.
     }
 
     private static void profileActionBarFlags() {
@@ -190,7 +196,15 @@ public class HookFlags {
         }
     }
 
+    private static void addRecommendedFlags(){
+        if(SettingsStatus.recommendedFlags) {
+            Map<String, Boolean> recFlags = FlagsSharedPref.getAll();
+            BOOL_FLAGS.putAll(recFlags);
+        }
+    }
+
     public static void load() {
+        addRecommendedFlags();
     }
 
     public static Boolean handleBoolFlags(long mobileConfigSpecifier) {

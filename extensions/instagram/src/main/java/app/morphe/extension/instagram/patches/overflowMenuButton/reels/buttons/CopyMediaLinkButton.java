@@ -11,12 +11,12 @@ import android.content.Context;
 import app.morphe.extension.instagram.patches.copyMediaLink.CopyMediaLinkUtils;
 
 public class CopyMediaLinkButton extends ReelButton {
-    public CopyMediaLinkButton(Context context, Object mediaObject) {
-        super(context, mediaObject);
+    public CopyMediaLinkButton(Context context, Object mediaObject, int currentMediaIndex) {
+        super(context, mediaObject, currentMediaIndex);
     }
 
     @Override
     public void onClick(View view) {
-        CopyMediaLinkUtils.copyMediaLinkDialog(this.context, null, this.mediaObject, 0);
+        CopyMediaLinkUtils.copyMediaLinkDialog(this.context, null, this.mediaObject, this.currentMediaIndex);
     }
 }
