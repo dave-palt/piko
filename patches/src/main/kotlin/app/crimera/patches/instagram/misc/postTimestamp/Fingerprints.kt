@@ -40,7 +40,8 @@ internal object ReelsCaption2SYFingerprint : Fingerprint(
 internal object FeedHeaderSubtitleListFingerprint : Fingerprint(
     strings = listOf("MediaHeaderInvalidUiState"),
     custom = { methodDef, _ ->
-        methodDef.name == "A07" &&
+        // 435: A07; 439: A06 — both take Context first and Media second.
+        methodDef.name in setOf("A06", "A07") &&
             methodDef.parameterTypes.firstOrNull() == "Landroid/content/Context;"
     },
 )
