@@ -22,7 +22,7 @@ jobs:
           # Keep in sync with the stable AppTarget in
           # patches/.../instagram/utils/Constants.kt and with the asset
           # name on the `apk-bases` release tag.
-          - version: '435.0.0.37.76'
+          - version: '439.0.0.37.89'
     steps:
       - name: Checkout
         uses: actions/checkout@v7
