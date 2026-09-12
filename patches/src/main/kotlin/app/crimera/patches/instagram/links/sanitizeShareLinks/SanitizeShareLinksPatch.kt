@@ -6,20 +6,16 @@
 
 package app.crimera.patches.instagram.links.sanitizeShareLinks
 
+import app.crimera.patches.instagram.links.shareLinks.hookShareLinks
 import app.crimera.patches.instagram.misc.settings.settingsPatch
 import app.crimera.patches.instagram.utils.Constants.COMPATIBILITY_INSTAGRAM
 import app.crimera.patches.instagram.utils.Constants.LINKS_DESCRIPTOR
 import app.crimera.patches.instagram.utils.Constants.LOCAL_SHARE_LINK_CLASS
 import app.crimera.patches.instagram.utils.enableSettings
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
-import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
-import app.morphe.patcher.extensions.InstructionExtensions.instructions
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.util.smali.ExternalLabel
-import app.morphe.util.indexOfFirstInstruction
-import app.morphe.util.registersUsed
-import com.android.tools.smali.dexlib2.Opcode
 
 @Suppress("unused")
 val sanitizeShareLinksPatch =
@@ -31,57 +27,20 @@ val sanitizeShareLinksPatch =
         compatibleWith(COMPATIBILITY_INSTAGRAM)
 
         execute {
+            hookShareLinks("sanitizeUrl")
 
-            val EXTENSION_METHOD =
-                """
-                invoke-static/range { v%s .. v%s }, ${LINKS_DESCRIPTOR}->sanitizeUrl(Ljava/lang/String;)Ljava/lang/String;
-                move-result-object v%s
-                """.trimIndent()
-
-            val jsonParserFingerprints =
-                listOf(
-                    PermalinkResponseJsonParserFingerprint,
-                    ProfileUrlResponseJsonParserFingerprint,
-                )
-
-            jsonParserFingerprints.forEach { fingerprint ->
-                val strIndex = fingerprint.stringMatches[0].index
-                fingerprint.method.apply {
-                    val strIPutObjectIndex = indexOfFirstInstruction(strIndex, Opcode.IPUT_OBJECT)
-                    val urlRegister = instructions[strIPutObjectIndex].registersUsed[0]
-
-                    addInstructions(strIPutObjectIndex, EXTENSION_METHOD.format(urlRegister, urlRegister, urlRegister))
-                }
-            }
-
-            val responseImplFingerprint =
-                listOf(
-                    StoryUrlResponseImplFingerprint,
-                    LiveUrlResponseImplFingerprint,
-                )
-
-            responseImplFingerprint.forEach { fingerprint ->
-                fingerprint.method.apply {
-                    val returnObjectInst = instructions.last { it.opcode == Opcode.RETURN_OBJECT }
-                    val index = returnObjectInst.location.index
-                    val urlRegister = returnObjectInst.registersUsed[0]
-
-                    addInstructions(index, EXTENSION_METHOD.format(urlRegister, urlRegister, urlRegister))
-                }
-            }
-
-            // Short-circuit the share-URL network round-trips: the server
-            // response only wraps a URL derivable from on-device data
+            // Fork (fork30/31): short-circuit the share-URL network round-trips.
+            // The server response only wraps a URL derivable from on-device data
             // (shortcode / username) plus an igsh tracking token that
-            // sanitizeUrl strips anyway. When the toggle is on, the
-            // request-builder methods return a locally-completed X/2Hd task;
-            // the extension helper returns null on any failure, which falls
-            // through to the original network request.
-
-            // Local share-link short-circuit is DORMANT pending on-device
-            // debugging (fork30 regression: icon didn't swap + delayed crash).
-            // Gated behind the piko_debug_kill_switch pref so the code stays
-            // reachable for a debug build without rebuilding the bundle.
+            // sanitizeUrl strips anyway. When enabled, the request-builder
+            // methods return a locally-completed task; the extension helper
+            // returns null on any failure, which falls through to the original
+            // network request.
+            //
+            // DORMANT pending on-device debugging (fork30 regression: icon
+            // didn't swap + delayed crash). Gated behind the
+            // piko_debug_kill_switch pref so the code stays reachable for a
+            // debug build without rebuilding the bundle.
             //
             // X/MFy.A00(UserSession, Media, 6xB, Integer, String)LX/2Hd — media permalink.
             // Pass the raw Media (p1); the extension resolves shortcode/type

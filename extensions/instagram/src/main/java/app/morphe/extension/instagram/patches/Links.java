@@ -7,17 +7,21 @@
 
 package app.morphe.extension.instagram.patches;
 
+import static app.morphe.extension.instagram.utils.IgStr.str;
+
 import android.net.Uri;
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Arrays;
+import java.util.regex.Pattern;
 
 import app.morphe.extension.instagram.entity.Entity;
 import app.morphe.extension.instagram.entity.MediaData;
 import app.morphe.extension.instagram.settings.SettingsStatus;
 import app.morphe.extension.instagram.utils.Pref;
 import app.morphe.extension.shared.Logger;
+import app.morphe.extension.shared.ShareLinkSanitizer;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.instagram.constants.PostType;
 import app.morphe.extension.instagram.constants.Constants;
@@ -31,6 +35,8 @@ public class Links {
             "com.bloks.www.bloks.ig.ndx.ci.entry.screen";
     private static final String NDX_LOCATION_SERVICES_SCREEN =
             "com.bloks.www.bloks.ig.ndx.ls.entry.screen";
+    private static final Pattern VALID_DOMAIN =
+            Pattern.compile("[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*(:\\d{1,5})?");
     private static final boolean DISABLE_ANALYTICS;
     private static final boolean DISABLE_STORIES;
     private static final boolean DISABLE_EXPLORE;
@@ -38,7 +44,13 @@ public class Links {
     private static final boolean DISABLE_DISCOVER_PEOPLE;
     private static final boolean DISABLE_ADS;
     private static final boolean DISABLE_HIGHLIGHTS;
+    private static final boolean DISABLE_ONBOARDING_PERMISSION_PROMPTS;
     private static final List<String> META_PACKAGES;
+    private static final ShareLinkSanitizer SHARE_LINK_SANITIZER = new ShareLinkSanitizer(
+            "instagram.com",
+            Arrays.asList("comment_id", "img_index", "open_comments", "story_media_id"),
+            Arrays.asList("igsh", "igsi", "utm_source", "utm_medium", "utm_content", "fbclid", "si")
+    );
 
     static {
         DISABLE_ANALYTICS = Pref.disableAnalytics() && SettingsStatus.disableAnalytics;
@@ -48,6 +60,7 @@ public class Links {
         DISABLE_COMMENTS = Pref.disableComments() && SettingsStatus.disableComments;
         DISABLE_DISCOVER_PEOPLE = Pref.disableDiscoverPeople() && SettingsStatus.disableDiscoverPeople;
         DISABLE_ADS = Pref.disableAds() && SettingsStatus.disableAds;
+        DISABLE_ONBOARDING_PERMISSION_PROMPTS = SettingsStatus.disableOnboardingPermissionPrompts;
 
         META_PACKAGES = Arrays.asList(
                 "com.instagram.android",      // Instagram
@@ -75,9 +88,10 @@ public class Links {
      * Blocks the onboarding permission screens ("Set up on new device" / contacts import /
      * location services) that Instagram re-shows when the "prompt seen" report is blocked
      * by disable-analytics. Called from the patched Bloks full-screen opener.
+     * Pref-gated by the dedicated disable-onboarding-prompts toggle (upstream v3.9.0 shape).
      */
     public static boolean shouldBlockOnboardingScreen(String appId) {
-        if (!DISABLE_ANALYTICS || appId == null) {
+        if (!DISABLE_ONBOARDING_PERMISSION_PROMPTS || appId == null) {
             return false;
         }
 
@@ -114,6 +128,9 @@ public class Links {
                         || host.contains("graph.facebook.com")
                         || path.contains("/logging_client_events")) {
                     shouldBlockUri = DISABLE_ANALYTICS;
+                } else if (path.contains("/consent/existing_user_flow/")
+                        || path.contains("/consent/new_user_flow/")) {
+                    shouldBlockUri = DISABLE_ONBOARDING_PERMISSION_PROMPTS;
                 } else if (path.contains("/api/v2/media/seen/")) {
                     shouldBlockUri = Pref.viewStoriesAnonymously();
                 } else if (path.contains("/heartbeat_and_get_viewer_count/")) {
@@ -166,46 +183,56 @@ public class Links {
      */
     public static String sanitizeUrl(String url){
         try{
-            if (url == null || url.indexOf('?') < 0) {
-                return url;
-            }
-
-            Uri parsed = Uri.parse(url);
-            String host = parsed.getHost();
-            if (host != null) {
-                host = host.toLowerCase();
-            }
-            boolean igHost = false;
-            if (host != null) {
-                igHost = host.equals("instagram.com") || host.endsWith(".instagram.com")
-                        || host.equals("instagr.am") || host.endsWith(".instagr.am");
-            }
-            if (igHost) {
-                Uri.Builder rebuilt = parsed.buildUpon().clearQuery();
-                String imgIndex = parsed.getQueryParameter("img_index");
-                if (imgIndex != null) {
-                    rebuilt.appendQueryParameter("img_index", imgIndex);
-                }
-                return rebuilt.build().toString();
-            }
-
-            return stripTrackingParams(url);
+            // Fork keeps the stricter IG-host behavior via ShareLinkSanitizer allowlist
+            // (same strip-all philosophy as fork29; upstream v3.9.0 shape).
+            return SHARE_LINK_SANITIZER.sanitize(url, Pref.sanitizeShareLinks());
         } catch (Exception e) {
             Logger.printException(() -> "sanitizeUrl failed: ", e);
         }
         return url;
     }
 
-    private static String stripTrackingParams(String url) {
-        return url.replaceAll("([&?])igsh=[^&]*", "")
-                .replaceAll("([&?])igshid=[^&]*", "")
-                .replaceAll("([&?])shid=[^&]*", "")
-                .replaceAll("([&?])igsi=[^&]*", "")
-                .replaceAll("([&?])utm_source=[^&]*", "")
-                .replaceAll("([&?])utm_medium=[^&]*", "")
-                .replaceAll("([&?])utm_content=[^&]*", "")
-                .replaceAll("([&?])fbclid=[^&]*", "")
-                .replaceAll("([&?])si=[^&]*", "");
+    public static String changeDomain(String url) {
+        try {
+            String domain = normalizeCustomDomain(Pref.customSharingDomain());
+            if (domain.isEmpty()) return url;
+
+            Uri uri = Uri.parse(url);
+            String host = uri.getHost();
+
+            if (host == null
+                    || !(host.equalsIgnoreCase("instagram.com") || host.equalsIgnoreCase("www.instagram.com"))
+                    || host.equalsIgnoreCase(domain)) {
+                return url;
+            }
+
+            return uri.buildUpon().encodedAuthority(domain).build().toString();
+        } catch (Exception e) {
+            Logger.printException(() -> "changeDomain failed: ", e);
+        }
+        return url;
+    }
+
+    public static String customSharingDomainSummary(String customDomain) {
+        String domain = normalizeCustomDomain(customDomain);
+        return domain.isEmpty() ? str("piko_custom_sharing_domain_desc") : domain;
+    }
+
+    private static String normalizeCustomDomain(String customDomain) {
+        String domain = customDomain.trim()
+                .replaceFirst("^[^/?#]*://", "")
+                .replaceFirst("[/?#].*", "")
+                .replaceFirst("^[^@]*@", "");
+
+        int portStart = domain.lastIndexOf(':');
+        String host = portStart < 0 ? domain : domain.substring(0, portStart);
+        String port = portStart < 0 ? "" : domain.substring(portStart);
+
+        String bareHost = host.regionMatches(true, 0, "www.", 0, 4) ? host.substring(4) : host;
+        if (!bareHost.isEmpty() && bareHost.indexOf('.') < 0) host += ".com";
+
+        domain = host + port;
+        return VALID_DOMAIN.matcher(domain).matches() ? domain : "";
     }
 
     public static boolean signatureCheck(Object appIdentityObject){
