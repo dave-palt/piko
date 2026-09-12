@@ -100,8 +100,6 @@ public class HookFlags {
         BOOL_FLAGS.put("79140", false);   //igd_gen_ai_craft_h2_2024
         BOOL_FLAGS.put("79677", false);   //igd_meta_ai_preemptive_prefetch
         BOOL_FLAGS.put("79859", false);   //ig_android_mai_imagine
-        BOOL_FLAGS.put("80171", false);   //odin_ig_android_metaai_ner
-        BOOL_FLAGS.put("80172", false);   //odin_ig_android_metaai_integrity
         BOOL_FLAGS.put("80654", false);   //ig_meta_ai_cdd_reels_viewer
         BOOL_FLAGS.put("80730", false);   //meta_ai_android_ig_intent_nux_key
         BOOL_FLAGS.put("82374", false);   //ig_android_genai_ai_filter
