@@ -180,7 +180,11 @@ val postTimestampPatch =
                                 .map { it.index + 1 }
                         if (gateBranches.isEmpty()) error("no caption-expanded gate branch in $definingClass.$renderName")
 
-                        gateBranches.sortedDescending().forEach { forceGateAt(it) }
+                        // Reels render + builder methods keep a fully-packed
+                        // low register file (17-18 locals); morphe's liveness
+                        // scan fails. v7 is dead at the gate sites in both
+                        // render methods (verified against 439 smali).
+                        gateBranches.sortedDescending().forEach { forceGateWithScratch(it, 7) }
                     }
 
                 // The public builder (A0o, the fingerprinted method) guards
@@ -211,7 +215,9 @@ val postTimestampPatch =
                             gateIdx
                         }.distinct()
 
-                    gateBranches.sortedDescending().forEach { forceGateAt(it) }
+                    // Builder-side gates: v9 dead at both render-invoke
+                    // gate windows in both builders (verified 439 smali).
+                    gateBranches.sortedDescending().forEach { forceGateWithScratch(it, 9) }
                 }
             }
 
