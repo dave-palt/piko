@@ -34,8 +34,8 @@ import app.morphe.extension.shared.Logger;
  * import re-writes through it (a fresh install generates a new key; writing the
  * plaintext through IG's writer re-encrypts with the new key).</p>
  *
- * <p>Access is reflective over the obfuscated classes (X.2xf static loader,
- * X.2wz cask prefs) so no stubs are needed. Both classes live in classes1.dex
+ * <p>Access is reflective over the obfuscated classes (439: X.02ji static loader,
+ * X.02jd cask prefs) so no stubs are needed. Both classes live in classes1.dex
  * on 435 and are stable there; every entry point logs on failure.</p>
  *
  * <p>Exported JSON shape:</p>
@@ -52,9 +52,16 @@ public final class SessionBackup {
 
     private static final String TAG = "SessionBackup";
 
-    /** Obfuscated loader: X.2xf.A00(Context, String, long, boolean) -> X.2wz */
-    private static final String CLASS_PREF_LOADER = "X.2xf";
-    private static final String CLASS_CASK_PREFS = "X.2wz";
+    /**
+     * Obfuscated cask plumbing, rotates between IG versions:
+     * 435: loader X.2xf.A00(Context,String,long,boolean) -> cask X.2wz (editor AuT, putString G8l)
+     * 439: loader X.02ji.A00(same shape) -> cask X.02jd (editor B73, putString GHB)
+     * The editor accessor and putString are looked up reflectively by shape
+     * (no-arg method returning an object with apply(); (String,String)V
+     * method on the editor), so method-name rotation alone won't break it.
+     */
+    private static final String CLASS_PREF_LOADER = "X.02ji";
+    private static final String CLASS_CASK_PREFS = "X.02jd";
     private static final String AUTH_HEADER_PREFS = "AuthHeaderPrefs";
 
     private SessionBackup() {}
@@ -339,8 +346,8 @@ public final class SessionBackup {
     // ------------------------------------------------------------------
 
     /**
-     * Instantiates a cask via X.2xf.A00 (loader picks the right encrypted-store
-     * transformer and memoizes it in X.2wz.A0A).
+     * Instantiates a cask via the loader's A00 (loader picks the right encrypted-store
+     * transformer and memoizes the cask map).
      */
     private static Object caskPrefs(Context context, String name) throws Exception {
         Class<?> loader = Class.forName(CLASS_PREF_LOADER);
@@ -414,30 +421,70 @@ public final class SessionBackup {
         }
     }
 
+
+    /**
+     * Shape-based cask editor resolution (435: AuT, 439: B73): the accessor is
+     * the no-arg method whose return type declares both apply() and a
+     * (String,String)V method.
+     */
+    private static Object caskEditor(Object prefs) throws Exception {
+        for (java.lang.reflect.Method m : prefs.getClass().getMethods()) {
+            if (m.getParameterCount() != 0) continue;
+            Class<?> rt = m.getReturnType();
+            if (rt == Object.class || rt.isPrimitive()) continue;
+            boolean hasApply = false;
+            boolean hasPut = false;
+            for (java.lang.reflect.Method em : rt.getMethods()) {
+                if (!hasApply && em.getName().equals("apply") && em.getParameterCount() == 0) {
+                    hasApply = true;
+                }
+                Class<?>[] p = em.getParameterTypes();
+                if (!hasPut && p.length == 2
+                        && String.class.isAssignableFrom(p[0])
+                        && String.class.isAssignableFrom(p[1])
+                        && em.getReturnType() == void.class) {
+                    hasPut = true;
+                }
+            }
+            if (hasApply && hasPut) {
+                return m.invoke(prefs);
+            }
+        }
+        throw new IllegalStateException("cask editor accessor not found");
+    }
+
+    /** putString on the editor: the (String,String)V method (435: G8l, 439: GHB). */
+    private static java.lang.reflect.Method editorPutString(Object editor) {
+        for (java.lang.reflect.Method m : editor.getClass().getMethods()) {
+            Class<?>[] p = m.getParameterTypes();
+            if (p.length == 2
+                    && String.class.isAssignableFrom(p[0])
+                    && String.class.isAssignableFrom(p[1])
+                    && m.getReturnType() == void.class) {
+                return m;
+            }
+        }
+        return null;
+    }
+
     /** Writes a whole map into the named cask through its editor. */
     private static boolean writeCask(Context context, String name, Map<String, String> entries) {
         try {
             Object prefs = caskPrefs(context, name);
-            Object editor = prefs.getClass().getMethod("AuT").invoke(prefs);
+            Object editor = caskEditor(prefs);
             if (editor == null) {
-                throw new IllegalStateException("cask AuT() returned null");
+                throw new IllegalStateException("cask editor accessor returned null");
             }
-            java.lang.reflect.Method putString = null;
+            java.lang.reflect.Method putString = editorPutString(editor);
             java.lang.reflect.Method apply = null;
             for (java.lang.reflect.Method m : editor.getClass().getMethods()) {
-                if (apply == null && m.getName().equals("apply") && m.getParameterCount() == 0) {
+                if (m.getName().equals("apply") && m.getParameterCount() == 0) {
                     apply = m;
-                }
-                Class<?>[] p = m.getParameterTypes();
-                if (putString == null && m.getName().equals("G8l")
-                        && p.length == 2
-                        && String.class.isAssignableFrom(p[0])
-                        && String.class.isAssignableFrom(p[1])) {
-                    putString = m;
+                    break;
                 }
             }
             if (putString == null || apply == null) {
-                throw new IllegalStateException("cask editor G8l/apply not found");
+                throw new IllegalStateException("cask editor putString/apply not found");
             }
             for (Map.Entry<String, String> e : entries.entrySet()) {
                 putString.invoke(editor, e.getKey(), e.getValue());
@@ -473,32 +520,26 @@ public final class SessionBackup {
     }
 
     /**
-     * Writes auth headers through X.2wz's editor (AuT() -> GuM, G8l(key, value),
+     * Writes auth headers through the cask editor (editor() -> putString(key, value),
      * apply()) so values are encrypted with the CURRENT install's keystore key.
      */
     private static boolean writeAuthHeaderPrefs(Context context, Map<String, String> authHeaders) {
         try {
             Object prefs = caskPrefs(context);
-            Object editor = prefs.getClass().getMethod("AuT").invoke(prefs);
+            Object editor = caskEditor(prefs);
             if (editor == null) {
-                throw new IllegalStateException("cask AuT() returned null");
+                throw new IllegalStateException("cask editor accessor returned null");
             }
-            java.lang.reflect.Method putString = null;
+            java.lang.reflect.Method putString = editorPutString(editor);
             java.lang.reflect.Method apply = null;
             for (java.lang.reflect.Method m : editor.getClass().getMethods()) {
-                if (apply == null && m.getName().equals("apply") && m.getParameterCount() == 0) {
+                if (m.getName().equals("apply") && m.getParameterCount() == 0) {
                     apply = m;
-                }
-                Class<?>[] p = m.getParameterTypes();
-                if (putString == null && m.getName().equals("G8l")
-                        && p.length == 2
-                        && String.class.isAssignableFrom(p[0])
-                        && String.class.isAssignableFrom(p[1])) {
-                    putString = m;
+                    break;
                 }
             }
             if (putString == null || apply == null) {
-                throw new IllegalStateException("cask editor G8l/apply not found");
+                throw new IllegalStateException("cask editor putString/apply not found");
             }
             for (Map.Entry<String, String> e : authHeaders.entrySet()) {
                 putString.invoke(editor, e.getKey(), e.getValue());
