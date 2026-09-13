@@ -87,10 +87,11 @@ public class RestoreSessionActivity extends AppCompatActivity {
         } catch (Exception e) {
             Logger.printException(() -> "RestoreSessionActivity: display name query failed", e);
         }
-        if (name != null) {
-            String lower = name.toLowerCase();
+        final String fileName = name; // effectively-final copy for the log lambda
+        if (fileName != null) {
+            String lower = fileName.toLowerCase();
             if (!lower.endsWith(".json") && !lower.endsWith(".txt")) {
-                Logger.printInfo(() -> "RestoreSessionActivity: wrong extension: " + name);
+                Logger.printInfo(() -> "RestoreSessionActivity: wrong extension: " + fileName);
                 Utils.showToastShort("Not a session backup file");
                 return;
             }
