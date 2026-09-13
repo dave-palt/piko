@@ -21,10 +21,14 @@ public class HookFlags {
     private static Map<String, Boolean> BOOL_FLAGS = new HashMap<>();
     private static DeveloperOptions developerOptions = new DeveloperOptions();
 
-    // Upstream v3.9.0: disable-onboarding-prompts replaced the universal 56295 flag
-    // kill with a screen-level Bloks block (our fork28 b82b7349 already ported the
-    // same approach), so these universal kills stay OUT. Kept as reference only.
-    // See DisableOnboardingPermissionPromptsPatch + Links.shouldDisableOnboarding.
+    // Universal flag kills paired with the Bloks screen-level block in
+    // DisableOnboardingPermissionPromptsPatch (load() calls this via the
+    // addFlags injection). Removing the method = NoSuchMethodError crash at
+    // app start — keep in sync with that patch.
+    private static void onboardingPermissionPromptFlags() {
+        BOOL_FLAGS.put("56295", false); //ig_device_permission_consent
+        BOOL_FLAGS.put("77866", false); //ig4a_d0_retention
+    }
 
     private static void simpleOverflowMenuFlags() {
         BOOL_FLAGS.put("104772", false); //ig_ini
