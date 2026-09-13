@@ -42,37 +42,45 @@ internal object PostHeaderUsernameFlowRowFingerprint : Fingerprint(
  * 0, leaving stock behavior byte-for-byte equivalent; with it on the branch
  * always takes the "timestamp visible" path.
  */
-private fun MutableMethod.forceGateAt(branchIndex: Int) {
-    val gateReg = getInstruction(branchIndex).registersUsed[0]
-    val scratch = findFreeRegister(branchIndex)
-    if (scratch < 0) error("no free register for gate forcing at index $branchIndex")
-    addInstructions(
+/**
+ * Verifier-safe gate forcing. The 435 idiom (or-int into the gate register)
+ * breaks on 439: Redex reuses the same low registers for BOTH the boolean
+ * gate and object references later in the method, so an int write makes the
+ * whole method fail VerifyError at class load (phone crash: X.04LW.A0o,
+ * "register v29 has type Conflict but expected Reference: X.03iH").
+ *
+ * Verifier-safe replacement: insert a preamble before the gate branch that
+ * jumps PAST it when the toggle is on, and otherwise falls into the original
+ * branch untouched:
+ *
+ *   invoke-static Pref->showPostTimestamp()Z
+ *   move-result vG
+ *   if-nez vG, :piko_gate_skip     <- ON: skip the stock gate entirely
+ *   <original branch>              <- OFF: stock behavior, byte-identical
+ *   :piko_gate_skip                <- both paths rejoin here
+ *
+ * vG (the gate register) is only READ, never written — the register type
+ * state the verifier tracks is unchanged, so no VerifyError. Works for both
+ * polarities: jumping past the branch lands on its fall-through side, which
+ * is the "show" continuation for every gate this patch targets (verified per
+ * site against the 439 smali).
+ *
+ * @param branchIndex index of the original if-eqz/if-nez gate branch
+ */
+private fun MutableMethod.forceGateByBranchSkip(branchIndex: Int) {
+    val branch = getInstruction(branchIndex)
+    val gateReg = branch.registersUsed[0]
+    addInstructionsWithLabels(
         branchIndex,
         """
         $PREF_CALL_DESCRIPTOR->showPostTimestamp()Z
-        move-result v$scratch
-        or-int v$gateReg, v$gateReg, v$scratch
-        """.trimIndent(),
+        move-result v$gateReg
+        if-nez v$gateReg, :piko_gate_ts_skip
+        """.trimIndent() + "\n",
+        ExternalLabel("piko_gate_ts_skip", getInstruction(branchIndex + 1)),
     )
 }
 
-/**
- * Same as [forceGateAt] but with a caller-supplied scratch register for
- * mega-methods where morphe's liveness scan gives up (e.g. the 439 classic
- * feed header builder: ~100 locals, fully packed register file). The caller
- * must have verified the scratch dead across the injection point.
- */
-private fun MutableMethod.forceGateWithScratch(branchIndex: Int, scratchReg: Int) {
-    val gateReg = getInstruction(branchIndex).registersUsed[0]
-    addInstructions(
-        branchIndex,
-        """
-        $PREF_CALL_DESCRIPTOR->showPostTimestamp()Z
-        move-result v$scratchReg
-        or-int v$gateReg, v$gateReg, v$scratchReg
-        """.trimIndent(),
-    )
-}
 
 @Suppress("unused")
 val postTimestampPatch =
@@ -143,7 +151,7 @@ val postTimestampPatch =
                         }
                     }
                     if (branchIndex == -1) error("layout branch after 135.A0M not found")
-                    forceGateAt(branchIndex)
+                    forceGateByBranchSkip(branchIndex)
                 }
             }
 
@@ -180,11 +188,9 @@ val postTimestampPatch =
                                 .map { it.index + 1 }
                         if (gateBranches.isEmpty()) error("no caption-expanded gate branch in $definingClass.$renderName")
 
-                        // Reels render + builder methods keep a fully-packed
-                        // low register file (17-18 locals); morphe's liveness
-                        // scan fails. v7 is dead at the gate sites in both
-                        // render methods (verified against 439 smali).
-                        gateBranches.sortedDescending().forEach { forceGateWithScratch(it, 7) }
+                        // Verifier-safe: preamble jumps past the gate when ON;
+                        // no register writes (439 gate regs alias objects).
+                        gateBranches.sortedDescending().forEach { forceGateByBranchSkip(it) }
                     }
 
                 // The public builder (A0o, the fingerprinted method) guards
@@ -215,9 +221,8 @@ val postTimestampPatch =
                             gateIdx
                         }.distinct()
 
-                    // Builder-side gates: v9 dead at both render-invoke
-                    // gate windows in both builders (verified 439 smali).
-                    gateBranches.sortedDescending().forEach { forceGateWithScratch(it, 9) }
+                    // Verifier-safe preamble injection (see above).
+                    gateBranches.sortedDescending().forEach { forceGateByBranchSkip(it) }
                 }
             }
 
@@ -246,18 +251,14 @@ val postTimestampPatch =
                         }.map { it.index }
                 if (gateCalls.isEmpty()) error("time-gate call not found in feed header subtitle list builder")
 
-                // Each call is followed by move-result vN + if-eqz vN. Scratch
-                // registers are dead per-site (verified against the 439 smali):
-                // the time-holder v0 gate sites have v5 dead, and the v5 gate
-                // site (tail) has v6 dead. morphe's findFreeRegister gives up
-                // on this fully-packed ~100-local mega-method.
+                // Each call is followed by move-result vN + if-eqz vN. The
+                // branch-skip preamble needs no scratch register at all, so
+                // the packed ~100-local mega-method is no longer a problem.
                 gateCalls.map { it + 1 }.sortedDescending().forEach { moveResultIndex ->
                     if (instructions[moveResultIndex].opcode != Opcode.MOVE_RESULT) {
                         error("time-gate call not followed by move-result")
                     }
-                    val gateReg = getInstruction(moveResultIndex + 1).registersUsed[0]
-                    val scratch = if (gateReg == 5) 6 else 5
-                    forceGateWithScratch(moveResultIndex + 1, scratch)
+                    forceGateByBranchSkip(moveResultIndex + 1)
                 }
             }
 
