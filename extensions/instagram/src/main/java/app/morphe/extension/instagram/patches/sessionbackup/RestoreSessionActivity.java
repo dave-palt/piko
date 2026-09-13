@@ -65,10 +65,28 @@ public class RestoreSessionActivity extends AppCompatActivity {
             return;
         }
 
-        // Cheap extension pre-check: SAF may hand us text/plain or octet-stream
-        // for .json files, so only reject clearly-wrong extensions here; the
-        // JSON parser below remains the real gate.
-        String name = uri.getLastPathSegment();
+        // Extension pre-check. Resolve the DISPLAY NAME via the content
+        // resolver — getLastPathSegment() returns the raw document ID on
+        // newer DocumentsUI providers (observed "13" on the API-36
+        // emulator), not the filename. The JSON parser below remains the
+        // real gate; extension is only a cheap early reject.
+        String name = null;
+        try {
+            android.database.Cursor c = getContentResolver().query(
+                    uri, null, null, null, null);
+            if (c != null) {
+                try {
+                    int idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                    if (idx >= 0 && c.moveToFirst()) {
+                        name = c.getString(idx);
+                    }
+                } finally {
+                    c.close();
+                }
+            }
+        } catch (Exception e) {
+            Logger.printException(() -> "RestoreSessionActivity: display name query failed", e);
+        }
         if (name != null) {
             String lower = name.toLowerCase();
             if (!lower.endsWith(".json") && !lower.endsWith(".txt")) {
