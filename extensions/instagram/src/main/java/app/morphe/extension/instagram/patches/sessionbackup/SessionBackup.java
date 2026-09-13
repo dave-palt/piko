@@ -376,14 +376,18 @@ public final class SessionBackup {
 
     /**
      * Enumerates cask names by listing the encrypted-store directory
-     * (files under <dataDir>/app_android_igapps_encryptedstore_single) plus
+     * (files under <dataDir>/files/single on 439, encryptedstore_single on 435) plus
      * plain-prefs fallback names present in shared_prefs.
      */
     private static java.util.List<String> caskNames(Context context) {
         java.util.ArrayList<String> names = new java.util.ArrayList<>();
         try {
             java.io.File dataDir = new File(context.getApplicationInfo().dataDir);
-            java.io.File store = new File(dataDir, "app_android_igapps_encryptedstore_single");
+            // 435: app_android_igapps_encryptedstore_single/; 439: files/single/
+            java.io.File store = new File(dataDir, "files/single");
+            if (!store.isDirectory()) {
+                store = new File(dataDir, "app_android_igapps_encryptedstore_single");
+            }
             java.io.File[] files = store.listFiles();
             if (files != null) {
                 for (java.io.File f : files) {

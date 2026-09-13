@@ -44,6 +44,7 @@ public class RestoreSessionActivity extends AppCompatActivity {
         if (requestCode == OPEN_FILE_REQUEST_CODE && resultCode == RESULT_OK) {
             Uri uri = data != null ? data.getData() : null;
             if (uri == null) {
+                Logger.printInfo(() -> "RestoreSessionActivity: result OK but uri null");
                 Utils.showToastShort("No file selected");
             } else {
                 restore(uri);
@@ -71,6 +72,7 @@ public class RestoreSessionActivity extends AppCompatActivity {
         if (name != null) {
             String lower = name.toLowerCase();
             if (!lower.endsWith(".json") && !lower.endsWith(".txt")) {
+                Logger.printInfo(() -> "RestoreSessionActivity: wrong extension: " + name);
                 Utils.showToastShort("Not a session backup file");
                 return;
             }
@@ -78,6 +80,7 @@ public class RestoreSessionActivity extends AppCompatActivity {
 
         try (InputStream in = getContentResolver().openInputStream(uri)) {
             if (in == null) {
+                Logger.printInfo(() -> "RestoreSessionActivity: openInputStream returned null for " + uri);
                 Utils.showToastShort("Failed to open file");
                 return;
             }
@@ -91,6 +94,7 @@ public class RestoreSessionActivity extends AppCompatActivity {
 
             boolean ok = SessionBackup.importSessionJson(Utils.getContext(), jsonText);
             if (!ok) {
+                Logger.printInfo(() -> "RestoreSessionActivity: importSessionJson returned false (see SessionBackup log above)");
                 Utils.showToastShort("Import failed");
                 return;
             }
