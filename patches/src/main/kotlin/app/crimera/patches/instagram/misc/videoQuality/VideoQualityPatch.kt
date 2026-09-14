@@ -88,6 +88,7 @@ val videoQualityPatch =
                 """
                 invoke-static {v$reg, p0}, $EXTENSION_CLASS_DESCRIPTOR->pick(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
                 move-result-object v$reg
+                check-cast v$reg, $VIDEO_URL_IMPL
                 """.trimIndent()
             }
 
@@ -95,6 +96,7 @@ val videoQualityPatch =
                 """
                 invoke-static {v$reg, p0}, $EXTENSION_CLASS_DESCRIPTOR->pickFromList(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
                 move-result-object v$reg
+                check-cast v$reg, $VIDEO_URL_IMPL
                 """.trimIndent()
             }
 
