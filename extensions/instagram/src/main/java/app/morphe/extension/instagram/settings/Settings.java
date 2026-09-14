@@ -87,6 +87,13 @@ public class Settings {
     public static final BooleanSetting FORCE_SEQUENCE = new BooleanSetting("force_sequence", true);
     public static final BooleanSetting READ_ONLY_FOLLOW_BUTTON = new BooleanSetting("read_only_follow_button", true);
     public static final BooleanSetting SHOW_POST_TIMESTAMP = new BooleanSetting("show_post_timestamp", true);
+    public static final StringSetting VIDEO_QUALITY_MODE = new StringSetting("video_quality_mode", "default");
+
+    public static final BooleanSetting SPOILER_SHIELD = new BooleanSetting("spoiler_shield", false);
+    public static final StringSetting SPOILER_SHIELD_MAX_AGE_HOURS = new StringSetting("spoiler_shield_max_age_hours", "2");
+    public static final StringSetting SPOILER_SHIELD_USERNAMES = new StringSetting("spoiler_shield_usernames", "");
+    public static final StringSetting SPOILER_SHIELD_HASHTAGS = new StringSetting("spoiler_shield_hashtags", "");
+    public static final StringSetting SPOILER_SHIELD_WORDS = new StringSetting("spoiler_shield_words", "");
 
     public static final BooleanSetting HIDE_NAVIGATION_FEED = new BooleanSetting("hide_navigation_feed", false);
     public static final BooleanSetting HIDE_NAVIGATION_REELS = new BooleanSetting("hide_navigation_reels", false);

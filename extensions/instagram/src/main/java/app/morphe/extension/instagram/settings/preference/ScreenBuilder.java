@@ -711,6 +711,43 @@ public class ScreenBuilder {
                     )
             );
         }
+        if (SettingsStatus.spoilerShield) {
+            addPreference(
+                    helper.switchPreference(
+                            str("piko_spoiler_shield"),
+                            str("piko_spoiler_shield_desc"),
+                            Settings.SPOILER_SHIELD
+                    )
+            );
+            addPreference(
+                    helper.editTextNumPreference(
+                            str("piko_spoiler_shield_max_age_hours"),
+                            str("piko_spoiler_shield_max_age_hours_desc"),
+                            Settings.SPOILER_SHIELD_MAX_AGE_HOURS
+                    )
+            );
+            addPreference(
+                    helper.editTextPreference(
+                            str("piko_spoiler_shield_usernames"),
+                            str("piko_spoiler_shield_usernames_desc"),
+                            Settings.SPOILER_SHIELD_USERNAMES
+                    )
+            );
+            addPreference(
+                    helper.editTextPreference(
+                            str("piko_spoiler_shield_hashtags"),
+                            str("piko_spoiler_shield_hashtags_desc"),
+                            Settings.SPOILER_SHIELD_HASHTAGS
+                    )
+            );
+            addPreference(
+                    helper.editTextPreference(
+                            str("piko_spoiler_shield_words"),
+                            str("piko_spoiler_shield_words_desc"),
+                            Settings.SPOILER_SHIELD_WORDS
+                    )
+            );
+        }
         if (SettingsStatus.copyCommentButton) {
             addPreference(
                     helper.switchPreference(
