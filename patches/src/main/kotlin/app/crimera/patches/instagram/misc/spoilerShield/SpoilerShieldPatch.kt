@@ -154,16 +154,12 @@ val spoilerShieldPatch =
                 }
             }
 
-            // Hook C: at the cover-config tail, the stock blur ImageUrl (v2 at the A01
-            // iput) is null for normal posts and the binder paints nothing. Rewrite it
-            // through the extension keyed by the fabricated title token. The title
-            // (getTitle -> v12 here) rides in the same register window; we key off the
-            // iput and scan back to the closest move-result feeding a register that is
-            // NOT the A01 source — simpler and stable: re-read the title via the payload
-            // is not possible here, so we key on the A0I payload's title at runtime by
-            // calling the extension with the raw stock URL and the local title register.
-            run {
-                val a01PutIndex =
+            // Hook C: at the cover-config tail, the stock blur ImageUrl at the 0DxY.A01
+            // iput is null for normal posts and the binder paints nothing. Rewrite it
+            // through the extension keyed by the payload title (fabrication stashed the
+            // title-token -> thumbnail URL map entry).
+            CoverBuilderEligibilityFingerprint.method.apply {
+                val a01PutIndex: Int =
                     instructions.indexOfFirst {
                         it.opcode == Opcode.IPUT_OBJECT &&
                             it.getReference<FieldReference>()?.let { ref ->
@@ -173,12 +169,11 @@ val spoilerShieldPatch =
                 require(a01PutIndex >= 0) { "spoiler shield: A01 iput not found in cover builder" }
 
                 // Registers: iput-object vSrc, vObj -> registersUsed = [src, obj]
-                val urlReg = getInstruction(a01PutIndex).registersUsed[0]
+                val urlReg: Int = getInstruction(a01PutIndex).registersUsed[0]
 
-                // The title register: the getTitle() move-result shortly before the
-                // new-instance 0DxY (v12 on 439). Find the last invoke-interface
-                // getTitle()Ljava/lang/String; before the iput and take its move-result.
-                var titleCallIndex = -1
+                // The title register: the getTitle() move-result before the 0DxY ctor
+                // (v12 on 439). Find the last invoke-interface getTitle() before the iput.
+                var titleCallIndex: Int = -1
                 for (i in a01PutIndex - 1 downTo 0) {
                     val insn = getInstruction(i)
                     if (insn.opcode == Opcode.INVOKE_INTERFACE) {
@@ -190,7 +185,7 @@ val spoilerShieldPatch =
                     }
                 }
                 require(titleCallIndex >= 0) { "spoiler shield: getTitle call not found in cover builder" }
-                val titleReg = getInstruction(titleCallIndex + 1).registersUsed[0]
+                val titleReg: Int = getInstruction(titleCallIndex + 1).registersUsed[0]
 
                 addInstructions(
                     a01PutIndex,
