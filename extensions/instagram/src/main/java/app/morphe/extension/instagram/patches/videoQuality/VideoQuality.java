@@ -26,6 +26,25 @@ public final class VideoQuality {
 
     private VideoQuality() {}
 
+    // Field handles are app-lifetime stable — resolve once, not per pick.
+    // Null until first successful resolve; readers fall back to a slow lookup.
+    private static java.lang.reflect.Field dtoListField;
+    private static java.lang.reflect.Field widthField;
+    private static java.lang.reflect.Field typeField;
+
+    private static java.lang.reflect.Field field(
+            java.lang.reflect.Field cached, Object instance, String name) {
+        if (cached != null) return cached;
+        try {
+            java.lang.reflect.Field f = instance.getClass().getDeclaredField(name);
+            f.setAccessible(true);
+            return f;
+        } catch (Exception e) {
+            // Unresolvable on this build — caller treats as absent data.
+            return null;
+        }
+    }
+
     /** Returns true when a non-default quality override is active. */
     private static boolean enabled() {
         String mode = mode();
@@ -100,8 +119,9 @@ public final class VideoQuality {
 
     private static java.util.List<?> variantListOf(Object mediaDto) {
         try {
-            java.lang.reflect.Field f = mediaDto.getClass().getDeclaredField("A0S");
-            f.setAccessible(true);
+            java.lang.reflect.Field f = field(dtoListField, mediaDto, "A0S");
+            if (f == null) return null;
+            dtoListField = f;
             Object v = f.get(mediaDto);
             if (v instanceof java.util.List) {
                 return (java.util.List<?>) v;
@@ -173,8 +193,9 @@ public final class VideoQuality {
 
     private static int widthOf(Object v) {
         try {
-            java.lang.reflect.Field f = v.getClass().getDeclaredField("A02");
-            f.setAccessible(true);
+            java.lang.reflect.Field f = field(widthField, v, "A02");
+            if (f == null) return -1;
+            widthField = f;
             return f.getInt(v);
         } catch (Exception e) {
             return -1;
@@ -183,8 +204,9 @@ public final class VideoQuality {
 
     private static Integer typeOf(Object v) {
         try {
-            java.lang.reflect.Field f = v.getClass().getDeclaredField("A01");
-            f.setAccessible(true);
+            java.lang.reflect.Field f = field(typeField, v, "A01");
+            if (f == null) return null;
+            typeField = f;
             return f.getInt(v);
         } catch (Exception e) {
             return null;
