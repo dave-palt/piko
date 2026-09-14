@@ -310,11 +310,17 @@ public final class SpoilerShield {
             }
 
             final Object[] args = new Object[17];
-            args[11] = "EARLY_ACCESS"; // renderType (Cmb)
+            // renderType intentionally NULL: "EARLY_ACCESS" routes the builder into the
+            // early-access branch that requires a server-provided blurred candidate
+            // (absent on normal posts -> A01 null -> nothing paints). Any other value
+            // falls through to the standard path where the builder synthesizes a blur
+            // cover URL from the media's own shortcode (05PA template) — that is the
+            // stock restricted-media rendering with title/subtitle text.
+            args[11] = null;           // renderType (Cmb)
             args[12] = reason;         // subtitle slot (DAF)
             args[13] = reason;
             args[14] = reason;
-            args[15] = "Spoiler hidden"; // title (getTitle)
+            args[15] = reason;         // title (getTitle) — the reason line
             return target.newInstance(args);
         } catch (Throwable t) {
             Logger.printException(() -> "SpoilerShield payload fabrication failed", t);
