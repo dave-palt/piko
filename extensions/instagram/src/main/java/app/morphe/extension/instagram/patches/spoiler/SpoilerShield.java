@@ -35,6 +35,7 @@ public final class SpoilerShield {
 
     private static volatile Method takenAtMethod;
     private static volatile boolean takenAtProbed;
+    private static int callCount;
 
     private SpoilerShield() {
     }
@@ -45,6 +46,12 @@ public final class SpoilerShield {
      */
     public static Object getMediaOverlayPayload(Object stockPayload, Object media) {
         try {
+            callCount++;
+            if (callCount == 1 || callCount % 25 == 0) {
+                Logger.printInfo(() -> "SpoilerShield call #" + callCount
+                        + " stock=" + (stockPayload == null ? "null" : stockPayload.getClass().getSimpleName())
+                        + " media=" + (media == null ? "null" : media.getClass().getName()));
+            }
             if (stockPayload != null) return stockPayload;
             if (media == null) return null;
             if (!Pref.spoilerShield()) return null;
@@ -52,7 +59,11 @@ public final class SpoilerShield {
             String reason = matchReason(media);
             if (reason == null) return null;
 
-            return fabricatePayload(reason);
+            Object payload = fabricatePayload(reason);
+            if (payload != null) {
+                Logger.printInfo(() -> "SpoilerShield covering media: " + reason);
+            }
+            return payload;
         } catch (Throwable t) {
             Logger.printException(() -> "SpoilerShield getMediaOverlayPayload failed", t);
             return stockPayload;
@@ -117,7 +128,12 @@ public final class SpoilerShield {
             }
         }
 
-        if (parts.isEmpty()) return null;
+        if (parts.isEmpty()) {
+            Logger.printInfo(() -> "SpoilerShield no match: user=" + usernameOf(media)
+                    + " captionLen=" + (caption == null ? -1 : caption.length())
+                    + " age=" + age + "s");
+            return null;
+        }
 
         parts.add("posted " + humanAge(age));
         return join(parts);
