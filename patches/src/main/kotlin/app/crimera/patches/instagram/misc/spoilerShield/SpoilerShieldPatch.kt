@@ -18,11 +18,14 @@ import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.util.getReference
 import app.morphe.util.registersUsed
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.Method
+import com.android.tools.smali.dexlib2.iface.instruction.Instruction
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
 /**
- * Spoiler shield hook: the media-overlay payload getter on com.instagram.feed.media.Media
+ * Spoiler shield hook A: the media-overlay payload getter on com.instagram.feed.media.Media
  * — the only no-arg method returning MediaOverlayPayloadSchemaIntf (435/439: A0I; resolved
  * by shape so renames across versions don't matter). Every blurred-cover consumer on
  * feed/reels/grid funnels through this single getter.
@@ -32,8 +35,8 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
  *
  * Injected before the return: pass (stockPayload, this) to SpoilerShield in the extension,
  * which returns the stock payload untouched unless it is null AND the user's spoiler rules
- * match this media — in that case a fabricated EARLY_ACCESS-style payload drives
- * Instagram's own blurred cover with the match reason as the cover text.
+ * match this media — in that case a fabricated payload drives Instagram's own blurred
+ * cover with the match reason as the cover text.
  */
 internal object MediaOverlayPayloadGetterFingerprint : Fingerprint(
     custom = { methodDef, classDef ->
@@ -44,7 +47,7 @@ internal object MediaOverlayPayloadGetterFingerprint : Fingerprint(
 )
 
 /**
- * Spoiler shield hook B: the cover-config builder method (439: X/0740.A00). Identified by
+ * Spoiler shield hook B + C: the cover-config builder (439: X/0740.A00). Identified by
  * shape — returns the cover-config type (0DxY) AND opens with two adjacent gates of the
  * form `invoke-virtual Media;-><rotating>()Z / move-result / if-eqz` guarding the media
  * path. For a normal post both gates are false, so the builder never consults the media
@@ -71,9 +74,52 @@ internal object CoverBuilderEligibilityFingerprint : Fingerprint(
     },
 )
 
-private fun isMediaBooleanGate(insns: List<com.android.tools.smali.dexlib2.iface.instruction.Instruction>, i: Int): Boolean {
-    val invoke = insns[i] as? com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction ?: return false
-    val ref = invoke.reference as? com.android.tools.smali.dexlib2.iface.reference.MethodReference ?: return false
+/**
+ * Spoiler shield hook D: the classic feed row controller's bind method (439: X/01Rd.A07).
+ * The controller gates the whole cover block behind two boolean flags (its own A0B and
+ * the row-state's A0d), both false for normal posts — the cover builder (and hooks B/C
+ * inside it) never runs. Identified by shape: invokes the cover builder
+ * (LX/0740;->A00, either invoke opcode) AND has 2-3 boolean iget+if-eqz gates in the
+ * GATE_WINDOW instructions right before that invoke. The 2-instruction gap between the
+ * two gates is stock (439); other builder callers (0GeQ, 09r2, 06EY...) lack these.
+ */
+internal object FeedRowCoverGateFingerprint : Fingerprint(
+    custom = { methodDef, _ ->
+        val impl = methodDef.implementation
+        if (impl == null) {
+            false
+        } else {
+            val insns = impl.instructions.toList()
+            val builderInvokeIndex = insns.indexOfFirst {
+                (it.opcode == Opcode.INVOKE_VIRTUAL ||
+                    it.opcode == Opcode.INVOKE_VIRTUAL_RANGE) &&
+                    (it as? ReferenceInstruction)?.reference.let { r ->
+                        (r as? MethodReference)?.definingClass == "LX/0740;" && r.name == "A00"
+                    } == true
+            }
+            if (builderInvokeIndex < 0) {
+                false
+            } else {
+                val gateCount =
+                    insns.withIndex()
+                        .count { (index, insn) ->
+                            index < builderInvokeIndex &&
+                                builderInvokeIndex - index <= GATE_WINDOW &&
+                                insn.opcode == Opcode.IGET_BOOLEAN &&
+                                (insn as? ReferenceInstruction)?.reference.let { r ->
+                                    (r as? FieldReference)?.type == "Z"
+                                } == true &&
+                                insns.getOrNull(index + 1)?.opcode == Opcode.IF_EQZ
+                        }
+                gateCount in 2..3
+            }
+        }
+    },
+)
+
+private fun isMediaBooleanGate(insns: List<Instruction>, i: Int): Boolean {
+    val invoke = insns[i] as? ReferenceInstruction ?: return false
+    val ref = invoke.reference as? MethodReference ?: return false
     if (invoke.opcode != Opcode.INVOKE_VIRTUAL) return false
     if (ref.definingClass != "Lcom/instagram/feed/media/Media;") return false
     if (ref.parameterTypes.isNotEmpty() || ref.returnType != "Z") return false
@@ -81,6 +127,9 @@ private fun isMediaBooleanGate(insns: List<com.android.tools.smali.dexlib2.iface
     if (insns[i + 2].opcode != Opcode.IF_EQZ) return false
     return true
 }
+
+/** How many instructions before the builder invoke the row gates can sit (439: ~35). */
+private const val GATE_WINDOW = 60
 
 @Suppress("unused")
 val spoilerShieldPatch =
@@ -93,10 +142,8 @@ val spoilerShieldPatch =
         dependsOn(settingsPatch)
 
         execute {
+            // Hook A: payload getter — fabricate the cover payload for matching media.
             MediaOverlayPayloadGetterFingerprint.method.apply {
-                // The stock getter tail: iget-object vN ...; return-object vN.
-                // We rewrite the return source: keep the stock iget chain, then hand the
-                // loaded payload + the Media (p0) to the extension instead of returning it.
                 val retIndex = instructions.indexOfLast { it.opcode == Opcode.RETURN_OBJECT }
                 require(retIndex >= 0) { "spoiler shield: no return-object in payload getter" }
                 val loadInsn = getInstruction(retIndex - 1)
@@ -105,9 +152,6 @@ val spoilerShieldPatch =
                 ) { "spoiler shield: payload getter does not load a field before returning" }
                 val payloadReg = loadInsn.registersUsed[0]
 
-                // Insert before the original return-object: the stock return now carries
-                // the extension result. OFF path: extension is a pass-through, so the
-                // stock payload flows through the same registers byte-equivalently.
                 addInstructions(
                     retIndex,
                     """
@@ -119,8 +163,6 @@ val spoilerShieldPatch =
 
             // Hook B: force the two eligibility gates inside the cover builder so matching
             // media take the media-payload path (where hook A supplies the cover payload).
-            // Inserted right after each gate's move-result: OR in our verdict. OFF path
-            // ORs in 0 = stock behavior. The Media object is the gate invoke's base reg.
             CoverBuilderEligibilityFingerprint.method.apply {
                 val gateSites =
                     instructions.withIndex()
@@ -168,11 +210,8 @@ val spoilerShieldPatch =
                     }
                 require(a01PutIndex >= 0) { "spoiler shield: A01 iput not found in cover builder" }
 
-                // Registers: iput-object vSrc, vObj -> registersUsed = [src, obj]
                 val urlReg: Int = getInstruction(a01PutIndex).registersUsed[0]
 
-                // The title register: the getTitle() move-result before the 0DxY ctor
-                // (v12 on 439). Find the last invoke-interface getTitle() before the iput.
                 var titleCallIndex: Int = -1
                 for (i in a01PutIndex - 1 downTo 0) {
                     val insn = getInstruction(i)
@@ -197,6 +236,58 @@ val spoilerShieldPatch =
                     check-cast v$urlReg, Lcom/instagram/common/typedurl/ImageUrl;
                     """.trimIndent(),
                 )
+            }
+
+            // Hook D: force the feed row controller's two cover-path entry flags. On a
+            // normal post both are false and the cover block (builder + hooks B/C) is
+            // skipped entirely. Pattern (439: 01Rd.A07):
+            //   iget-boolean v5, v2, 01Rd;->A0B:Z / if-eqz v5, :skip
+            //   iget-boolean v5, v9, 01As;->A0d:Z / if-eqz v5, :skip
+            // The second gate's object register (v9 = row state) carries Media-typed
+            // fields, so the extension can key the verdict on the row's media. We
+            // rewrite each gate's boolean in place (Z register, single consumer).
+            // ONLY the gates within the window right before the builder invoke — the
+            // method holds many unrelated boolean gates.
+            FeedRowCoverGateFingerprint.method.apply {
+                val builderInvokeIndex =
+                    instructions.indexOfFirst {
+                        (it.opcode == Opcode.INVOKE_VIRTUAL ||
+                            it.opcode == Opcode.INVOKE_VIRTUAL_RANGE) &&
+                            it.getReference<MethodReference>()?.let { ref ->
+                                ref.definingClass == "LX/0740;" && ref.name == "A00"
+                            } == true
+                    }
+                require(builderInvokeIndex >= 0) {
+                    "spoiler shield: cover builder invoke not found in feed row controller"
+                }
+
+                val gateSites =
+                    instructions.withIndex()
+                        .filter { (index, insn) ->
+                            index < builderInvokeIndex &&
+                                builderInvokeIndex - index <= GATE_WINDOW &&
+                                insn.opcode == Opcode.IGET_BOOLEAN &&
+                                insn.getReference<FieldReference>()?.type == "Z" &&
+                                instructions.getOrNull(index + 1)?.opcode == Opcode.IF_EQZ
+                        }
+                        .map { (index, insn) ->
+                            // iget-boolean vDst, vObj -> registersUsed = [dst, obj]
+                            index to insn.registersUsed[1]
+                        }
+                require(gateSites.size in 2..3) {
+                    "spoiler shield: expected 2-3 cover gates before builder invoke, found ${gateSites.size}"
+                }
+
+                gateSites.sortedByDescending { it.first }.forEach { (igetIndex, objReg) ->
+                    val flagReg = getInstruction(igetIndex).registersUsed[0]
+                    addInstructions(
+                        igetIndex + 1,
+                        """
+                        invoke-static {v$flagReg, v$objReg}, $PATCHES_DESCRIPTOR/spoiler/SpoilerShield;->forceRowFlag(ZLjava/lang/Object;)Z
+                        move-result v$flagReg
+                        """.trimIndent(),
+                    )
+                }
             }
 
             enableSettings("spoilerShield")
