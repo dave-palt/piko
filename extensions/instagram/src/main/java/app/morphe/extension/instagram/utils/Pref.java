@@ -335,6 +335,10 @@ public class Pref {
         return SharedPref.getBooleanPref(Settings.SPOILER_SHIELD) && SettingsStatus.spoilerShield;
     }
 
+    public static String videoQualityMode() {
+        return SharedPref.getStringPref(Settings.VIDEO_QUALITY_MODE);
+    }
+
     public static String spoilerShieldMaxAgeHours() {
         return SharedPref.getStringPref(Settings.SPOILER_SHIELD_MAX_AGE_HOURS);
     }

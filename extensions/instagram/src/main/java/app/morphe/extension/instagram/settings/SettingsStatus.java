@@ -207,7 +207,7 @@ public class SettingsStatus {
     public static void moreOptionsOnPost() { moreOptionsOnPost = true; }
     public static boolean moreOptionsOnProfile = false;
     public static void moreOptionsOnProfile() { moreOptionsOnProfile = true; }
-    public static boolean miscSection() {return ( saveMediaCommentButton || moreOptionsOnProfile || moreOptionsOnPost || customiseStoryRingSize || changeLikeAnimation || unlockPlusBenefits || storiesAudioAutoplay || disableVideoAutoplay || removeEmptyBottomSpace || copyCommentButton || improveImageViewing || customiseStoryTimestamp || disableAnalytics || disableDiscoverPeople || followBackIndicator || viewStoryMentions || disableStoryFlipping || loopStory || hideReshareButton || forceSequence || readOnlyFollowButton || showPostTimestamp || spoilerShield);}
+    public static boolean miscSection() {return ( saveMediaCommentButton || moreOptionsOnProfile || moreOptionsOnPost || customiseStoryRingSize || changeLikeAnimation || unlockPlusBenefits || storiesAudioAutoplay || disableVideoAutoplay || removeEmptyBottomSpace || copyCommentButton || improveImageViewing || customiseStoryTimestamp || disableAnalytics || disableDiscoverPeople || followBackIndicator || viewStoryMentions || disableStoryFlipping || loopStory || hideReshareButton || forceSequence || readOnlyFollowButton || showPostTimestamp || spoilerShield || videoQuality);}
 
     //DM section
     public static boolean unlimitedReplaysOnEphemeralMedia = false;
@@ -243,6 +243,8 @@ public class SettingsStatus {
 
     public static boolean spoilerShield = false;
     public static void spoilerShield() { spoilerShield = true; }
+    public static boolean videoQuality = false;
+    public static void videoQuality() { videoQuality = true; }
 
     public static boolean hideNavigationButtons = false;
     public static void hideNavigationButtons() { hideNavigationButtons = true; }
@@ -313,6 +315,7 @@ public class SettingsStatus {
         FLAGS.put(str("piko_read_only_follow_button"),SettingsStatus.readOnlyFollowButton);
         FLAGS.put(str("piko_show_post_timestamp"),SettingsStatus.showPostTimestamp);
         FLAGS.put(str("piko_spoiler_shield"),SettingsStatus.spoilerShield);
+        FLAGS.put(str("piko_video_quality"),SettingsStatus.videoQuality);
         FLAGS.put(str("piko_download_voice_media"),SettingsStatus.downloadVoiceMessage);
         FLAGS.put(str("piko_download_with_external_downloader"),SettingsStatus.downloadWithExternalDownloader);
         FLAGS.put(str("piko_more_profile_options"),SettingsStatus.moreOptionsOnProfile);
