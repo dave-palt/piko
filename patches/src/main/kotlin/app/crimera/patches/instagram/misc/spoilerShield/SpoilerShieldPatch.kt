@@ -278,12 +278,18 @@ val spoilerShieldPatch =
                     "spoiler shield: expected 2-3 cover gates before builder invoke, found ${gateSites.size}"
                 }
 
-                gateSites.sortedByDescending { it.first }.forEach { (igetIndex, objReg) ->
+                // Both injections key on the ROW register (the last gate's object reg,
+                // type 01As on 439 — the only object in the pair carrying Media fields;
+                // the first gate's object is the controller, which has none). The row
+                // register is a method parameter, live across both gates.
+                val rowReg: Int = gateSites.last().second
+
+                gateSites.sortedByDescending { it.first }.forEach { (igetIndex, _) ->
                     val flagReg = getInstruction(igetIndex).registersUsed[0]
                     addInstructions(
                         igetIndex + 1,
                         """
-                        invoke-static {v$flagReg, v$objReg}, $PATCHES_DESCRIPTOR/spoiler/SpoilerShield;->forceRowFlag(ZLjava/lang/Object;)Z
+                        invoke-static {v$flagReg, v$rowReg}, $PATCHES_DESCRIPTOR/spoiler/SpoilerShield;->forceRowFlag(ZLjava/lang/Object;)Z
                         move-result v$flagReg
                         """.trimIndent(),
                     )
