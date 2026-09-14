@@ -51,16 +51,19 @@ internal object MediaOverlayPayloadGetterFingerprint : Fingerprint(
  */
 internal object CoverBuilderEligibilityFingerprint : Fingerprint(
     custom = { methodDef, _ ->
-        val impl = methodDef.implementation ?: return@custom false
-        val insns = impl.instructions.toList()
-        var i = 0
-        while (i + 5 < insns.size) {
-            if (isMediaBooleanGate(insns, i) && isMediaBooleanGate(insns, i + 3)) {
-                return@custom true
+        val impl = methodDef.implementation
+        if (impl == null) {
+            false
+        } else {
+            val insns = impl.instructions.toList()
+            var found = false
+            var i = 0
+            while (!found && i + 5 < insns.size) {
+                found = isMediaBooleanGate(insns, i) && isMediaBooleanGate(insns, i + 3)
+                i++
             }
-            i++
+            found
         }
-        false
     },
 )
 
@@ -117,17 +120,17 @@ val spoilerShieldPatch =
             CoverBuilderEligibilityFingerprint.method.apply {
                 val gateSites =
                     instructions.withIndex()
-                        .filter { (_, insn) ->
-                            insn.opcode == Opcode.INVOKE_VIRTUAL &&
-                                insn.getReference<MethodReference>()?.let { ref ->
-                                    ref.definingClass == "Lcom/instagram/feed/media/Media;" &&
-                                        ref.parameterTypes.isEmpty() &&
-                                        ref.returnType == "Z"
-                                } == true &&
-                                run {
-                                    val next = instructions.getOrNull(it.index + 1)
-                                    next?.opcode == Opcode.MOVE_RESULT
-                                }
+                        .filter { (index, insn) ->
+                            val isGateInvoke =
+                                insn.opcode == Opcode.INVOKE_VIRTUAL &&
+                                    insn.getReference<MethodReference>()?.let { ref ->
+                                        ref.definingClass == "Lcom/instagram/feed/media/Media;" &&
+                                            ref.parameterTypes.isEmpty() &&
+                                            ref.returnType == "Z"
+                                    } == true
+                            val hasNextMoveResult =
+                                instructions.getOrNull(index + 1)?.opcode == Opcode.MOVE_RESULT
+                            isGateInvoke && hasNextMoveResult
                         }
                         .map { (index, insn) -> index to insn.registersUsed.first() }
                 require(gateSites.size >= 2) {
