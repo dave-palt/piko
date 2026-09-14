@@ -176,7 +176,9 @@ val spoilerShieldPatch =
                 var titleCallIndex: Int = -1
                 for (i in a01PutIndex - 1 downTo 0) {
                     val insn = getInstruction(i)
-                    if (insn.opcode == Opcode.INVOKE_INTERFACE) {
+                    if (insn.opcode == Opcode.INVOKE_INTERFACE ||
+                        insn.opcode == Opcode.INVOKE_INTERFACE_RANGE
+                    ) {
                         val ref = insn.getReference<MethodReference>()
                         if (ref?.name == "getTitle" && ref.returnType == "Ljava/lang/String;") {
                             titleCallIndex = i
