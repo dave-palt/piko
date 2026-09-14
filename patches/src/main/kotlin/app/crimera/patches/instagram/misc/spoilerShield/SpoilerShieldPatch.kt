@@ -18,6 +18,7 @@ import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.util.getReference
 import app.morphe.util.registersUsed
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
 /**
@@ -151,6 +152,51 @@ val spoilerShieldPatch =
                         """.trimIndent(),
                     )
                 }
+            }
+
+            // Hook C: at the cover-config tail, the stock blur ImageUrl at the 0DxY.A01
+            // iput is null for normal posts and the binder paints nothing. Rewrite it
+            // through the extension keyed by the payload title (fabrication stashed the
+            // title-token -> thumbnail URL map entry).
+            CoverBuilderEligibilityFingerprint.method.apply {
+                val a01PutIndex: Int =
+                    instructions.indexOfFirst {
+                        it.opcode == Opcode.IPUT_OBJECT &&
+                            it.getReference<FieldReference>()?.let { ref ->
+                                ref.definingClass == "LX/0DxY;" && ref.name == "A01"
+                            } == true
+                    }
+                require(a01PutIndex >= 0) { "spoiler shield: A01 iput not found in cover builder" }
+
+                // Registers: iput-object vSrc, vObj -> registersUsed = [src, obj]
+                val urlReg: Int = getInstruction(a01PutIndex).registersUsed[0]
+
+                // The title register: the getTitle() move-result before the 0DxY ctor
+                // (v12 on 439). Find the last invoke-interface getTitle() before the iput.
+                var titleCallIndex: Int = -1
+                for (i in a01PutIndex - 1 downTo 0) {
+                    val insn = getInstruction(i)
+                    if (insn.opcode == Opcode.INVOKE_INTERFACE ||
+                        insn.opcode == Opcode.INVOKE_INTERFACE_RANGE
+                    ) {
+                        val ref = insn.getReference<MethodReference>()
+                        if (ref?.name == "getTitle" && ref.returnType == "Ljava/lang/String;") {
+                            titleCallIndex = i
+                            break
+                        }
+                    }
+                }
+                require(titleCallIndex >= 0) { "spoiler shield: getTitle call not found in cover builder" }
+                val titleReg: Int = getInstruction(titleCallIndex + 1).registersUsed[0]
+
+                addInstructions(
+                    a01PutIndex,
+                    """
+                    invoke-static {v$urlReg, v$titleReg}, $PATCHES_DESCRIPTOR/spoiler/SpoilerShield;->coverImage(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+                    move-result-object v$urlReg
+                    check-cast v$urlReg, Lcom/instagram/common/typedurl/ImageUrl;
+                    """.trimIndent(),
+                )
             }
 
             enableSettings("spoilerShield")

@@ -44,6 +44,12 @@ public final class SpoilerShield {
     private static final Map<Object, Boolean> verdictCache =
             Collections.synchronizedMap(new WeakHashMap<Object, Boolean>());
 
+    /** Fabricated-title token -> media thumbnail URL, consumed by the cover-image hook. */
+    private static final Map<String, String> pendingCoverUrls =
+            Collections.synchronizedMap(new java.util.HashMap<String, String>());
+
+    private static long tokenSeq;
+
     private SpoilerShield() {
     }
 
@@ -66,7 +72,7 @@ public final class SpoilerShield {
             String reason = matchReason(media);
             if (reason == null) return null;
 
-            Object payload = fabricatePayload(reason);
+            Object payload = fabricatePayload(reason, thumbnailUrlOf(media));
             if (payload != null) {
                 Logger.printInfo(() -> "SpoilerShield covering media: " + reason);
             }
@@ -98,6 +104,31 @@ public final class SpoilerShield {
         } catch (Throwable t) {
             Logger.printException(() -> "SpoilerShield forceCoverEligibility failed", t);
             return stock;
+        }
+    }
+
+    /**
+     * Injection point C: the cover-config tail, right before the blur ImageUrl is stored.
+     * Stock leaves it null for normal posts (no server early-access candidate, no
+     * early-access URL template), and the binder paints nothing without it. We substitute
+     * a SimpleImageUrl over the media's own thumbnail — the binder then blurs it
+     * client-side (mini preview blur + dim color filter).
+     */
+    public static Object coverImage(Object stockImage, Object titleToken) {
+        try {
+            if (stockImage != null) return stockImage;
+            if (!(titleToken instanceof String)) return null;
+
+            String url = pendingCoverUrls.remove(titleToken);
+            if (url == null) return null;
+
+            Logger.printInfo(() -> "SpoilerShield supplying cover image");
+            return Class.forName("com.instagram.common.typedurl.SimpleImageUrl")
+                    .getConstructor(String.class)
+                    .newInstance(url);
+        } catch (Throwable t) {
+            Logger.printException(() -> "SpoilerShield coverImage failed", t);
+            return stockImage;
         }
     }
 
@@ -223,6 +254,22 @@ public final class SpoilerShield {
         }
     }
 
+    /** The media's own square thumbnail URL — the image the binder blurs for the cover. */
+    private static String thumbnailUrlOf(Object media) {
+        try {
+            Object imageInfo = new MediaData(media).getImageVariants();
+            // ImageData list: prefer the smallest (first) variant's URL
+            if (imageInfo instanceof java.util.List && !((java.util.List<?>) imageInfo).isEmpty()) {
+                Object imageData = ((java.util.List<?>) imageInfo).get(0);
+                java.lang.reflect.Method m = imageData.getClass().getMethod("getUrl");
+                return (String) m.invoke(imageData);
+            }
+        } catch (Throwable t) {
+            Logger.printException(() -> "SpoilerShield thumbnailUrlOf failed", t);
+        }
+        return null;
+    }
+
     /**
      * Resolves the media's taken-at epoch (seconds) by probing the Media class's no-arg
      * long getters: method names rotate per version, but there are only a handful and
@@ -294,7 +341,7 @@ public final class SpoilerShield {
      * shape (439): (ButtonSpec, IconSpec, 0Bdz x4, Boolean, Integer x3, String x6, List) —
      * resolved reflectively; any mismatch logs and returns null (stock behavior).
      */
-    private static Object fabricatePayload(String reason) {
+    private static Object fabricatePayload(String reason, String thumbnailUrl) {
         try {
             final Class<?> clazz = Class.forName(PAYLOAD_CLASS);
             Constructor<?> target = null;
@@ -309,18 +356,19 @@ public final class SpoilerShield {
                 return null;
             }
 
+            // Unique title token: the builder tail (hook C) matches it to swap in the
+            // cover image, since the payload itself carries no image.
+            final String token = "piko-spoiler:" + (tokenSeq++);
+            if (thumbnailUrl != null) {
+                pendingCoverUrls.put(token, thumbnailUrl);
+            }
+
             final Object[] args = new Object[17];
-            // renderType intentionally NULL: "EARLY_ACCESS" routes the builder into the
-            // early-access branch that requires a server-provided blurred candidate
-            // (absent on normal posts -> A01 null -> nothing paints). Any other value
-            // falls through to the standard path where the builder synthesizes a blur
-            // cover URL from the media's own shortcode (05PA template) — that is the
-            // stock restricted-media rendering with title/subtitle text.
             args[11] = null;           // renderType (Cmb)
             args[12] = reason;         // subtitle slot (DAF)
             args[13] = reason;
             args[14] = reason;
-            args[15] = reason;         // title (getTitle) — the reason line
+            args[15] = token;          // title (getTitle) — token consumed by hook C
             return target.newInstance(args);
         } catch (Throwable t) {
             Logger.printException(() -> "SpoilerShield payload fabrication failed", t);
