@@ -126,6 +126,10 @@ public class FeedButton {
         return FeedButton.initOverflowButton("PIKO_COPY_MEDIA_LINK", 504, UI.DRAWABLE_LINK_ICON);
     }
 
+    public static MediaOption$Option videoQualityOverflowButton(){
+        return FeedButton.initOverflowButton("PIKO_VIDEO_QUALITY", 505, UI.DRAWABLE_GEAR_ICON);
+    }
+
 
     private static void addDownloadButton(Object buttonAdderObject, ArrayList buttonlist) throws Exception {
         String DOWNLOAD_BUTTON_TEXT = str("piko_download_options");
@@ -149,6 +153,9 @@ public class FeedButton {
             if(Pref.copyMediaLink()) {
                 addButton(MediaOption$Option.PIKO_COPY_MEDIA_LINK, str("piko_copy_media_link"), buttonAdderObject, buttonlist);
             }
+            if(Pref.videoQualityPerPost()) {
+                addButton(MediaOption$Option.PIKO_VIDEO_QUALITY, str("piko_video_quality"), buttonAdderObject, buttonlist);
+            }
             if(Pref.moreOptionsOnPost()) {
                 addButton(MediaOption$Option.PIKO_MORE_POST_OPTION, str("piko_more_options"), buttonAdderObject, buttonlist);
             }
@@ -163,7 +170,8 @@ public class FeedButton {
                 (SettingsStatus.downloadMedia && pressedButton.equals(MediaOption$Option.PIKO_DOWNLOAD)) ||
                 (SettingsStatus.moreOptionsOnPost && pressedButton.equals(MediaOption$Option.PIKO_MORE_POST_OPTION)) ||
                 (SettingsStatus.downloadWithExternalDownloader && pressedButton.equals(MediaOption$Option.PIKO_EXTERNAL_DOWNLOADER)) ||
-                (SettingsStatus.copyMediaLink && pressedButton.equals(MediaOption$Option.PIKO_COPY_MEDIA_LINK))
+                (SettingsStatus.copyMediaLink && pressedButton.equals(MediaOption$Option.PIKO_COPY_MEDIA_LINK)) ||
+                (Pref.videoQualityPerPost() && pressedButton.equals(MediaOption$Option.PIKO_VIDEO_QUALITY))
         );
     }
 
@@ -183,6 +191,9 @@ public class FeedButton {
 
             } else if (SettingsStatus.copyMediaLink && pressedButton.equals(MediaOption$Option.PIKO_COPY_MEDIA_LINK)) {
                 CopyMediaLinkUtils.copyMediaLinkDialog(context, userSession, mediaObject, currentMediaIndex);
+
+            } else if (Pref.videoQualityPerPost() && pressedButton.equals(MediaOption$Option.PIKO_VIDEO_QUALITY)) {
+                app.morphe.extension.instagram.patches.videoQuality.VideoQualityPicker.show(context, mediaObject, currentMediaIndex);
 
             }
 

@@ -88,6 +88,7 @@ public class Settings {
     public static final BooleanSetting READ_ONLY_FOLLOW_BUTTON = new BooleanSetting("read_only_follow_button", true);
     public static final BooleanSetting SHOW_POST_TIMESTAMP = new BooleanSetting("show_post_timestamp", true);
     public static final StringSetting VIDEO_QUALITY_MODE = new StringSetting("video_quality_mode", "default");
+    public static final BooleanSetting VIDEO_QUALITY_PER_POST = new BooleanSetting("video_quality_per_post", true);
 
     public static final BooleanSetting SPOILER_SHIELD = new BooleanSetting("spoiler_shield", false);
     public static final StringSetting SPOILER_SHIELD_MAX_AGE_HOURS = new StringSetting("spoiler_shield_max_age_hours", "2");

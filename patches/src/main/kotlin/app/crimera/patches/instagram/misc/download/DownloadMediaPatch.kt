@@ -55,6 +55,7 @@ val downloadMediaPatch =
         execute {
 
             addOverflowMenuButtonAttributes("PIKO_DOWNLOAD", "downloadOverflowButton")
+            addOverflowMenuButtonAttributes("PIKO_VIDEO_QUALITY", "videoQualityOverflowButton")
 
             // DM media downloader.
             GetDirectThreadMediaSaverModuleNameFingerprint.apply {
