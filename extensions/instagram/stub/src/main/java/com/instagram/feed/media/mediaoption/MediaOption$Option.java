@@ -13,6 +13,7 @@ public class MediaOption$Option {
     public static final MediaOption$Option PIKO_DEBUG = new MediaOption$Option("", 0, 0);
     public static final MediaOption$Option PIKO_EXTERNAL_DOWNLOADER = new MediaOption$Option("", 0, 0);
     public static final MediaOption$Option PIKO_COPY_MEDIA_LINK = new MediaOption$Option("", 0, 0);
+    public static final MediaOption$Option PIKO_VIDEO_QUALITY = new MediaOption$Option("", 0, 0);
 
     public static final MediaOption$Option[] $values(){
         return null;

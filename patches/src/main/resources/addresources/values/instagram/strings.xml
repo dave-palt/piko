@@ -117,6 +117,12 @@
     <string name="piko_improve_image_viewing_desc">Fetches max resolution images from server. May reduce performance, increase app data size, or cause the app to switch to an older layout</string>
     <string name="piko_video_quality">Video playback quality</string>
     <string name="piko_video_quality_desc">Preferred in-app video playback resolution. Default keeps Instagram's automatic choice; lower values save data and CPU.</string>
+    <string name="piko_video_quality_per_post">Video quality button in menus</string>
+    <string name="piko_video_quality_per_post_desc">Adds a "Video quality" row to the post and reel ⋮ menu to pick the playback quality for that specific media</string>
+    <string name="piko_video_quality_not_video">This media is not a video</string>
+    <string name="piko_video_quality_no_variants">No video variants available</string>
+    <string name="piko_video_quality_applied">Quality applied on next load</string>
+    <string name="piko_video_quality_using_global">Using the global quality setting</string>
     <string name="piko_array_video_quality_default">Default (automatic)</string>
     <string name="piko_array_video_quality_highest">Highest available</string>
     <string name="piko_array_video_quality_720">Up to 720p</string>

@@ -21,6 +21,7 @@ import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.instagram.utils.Pref;
 import app.morphe.extension.instagram.settings.SettingsStatus;
 import app.morphe.extension.instagram.entity.Entity;
+import app.morphe.extension.instagram.entity.MediaData;
 import app.morphe.extension.instagram.constants.UI;
 
 import app.morphe.extension.instagram.patches.overflowMenuButton.reels.buttons.ReelButton;
@@ -29,6 +30,7 @@ import app.morphe.extension.instagram.patches.overflowMenuButton.reels.buttons.D
 import app.morphe.extension.instagram.patches.overflowMenuButton.reels.buttons.InfoButton;
 import app.morphe.extension.instagram.patches.overflowMenuButton.reels.buttons.ExternalDownloadButton;
 import app.morphe.extension.instagram.patches.overflowMenuButton.reels.buttons.CopyMediaLinkButton;
+import app.morphe.extension.instagram.patches.overflowMenuButton.reels.buttons.VideoQualityButton;
 
 public class AddReelButton {
 
@@ -107,10 +109,33 @@ public class AddReelButton {
         AddReelButton.addReelButton(context,reelOverflowButton,helperObject);
     }
 
+    private static void addVideoQualityButton(Context context, Object helperObject, Object mediaObject, int currentMediaIndex){
+        String icon = UI.DRAWABLE_GEAR_ICON;
+        ReelButton reelButton = new VideoQualityButton(context, mediaObject, currentMediaIndex);
+        String buttonText = str("piko_video_quality");
+
+        ReelOverflowButton reelOverflowButton = new ReelOverflowButton(icon, reelButton, buttonText);
+
+        AddReelButton.addReelButton(context, reelOverflowButton, helperObject);
+    }
+
+    /** True when the media at this index is a video (row only makes sense there). */
+    private static boolean isVideoMedia(Object mediaObject, int currentMediaIndex) {
+        try {
+            MediaData mediaData = new MediaData(mediaObject, null);
+            return mediaData.getMediaAt(currentMediaIndex).isVideo();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     // Called from hook — passes the real current carousel index.
     public static void includeCustomReelOverflowButtons(Context context, Object helperObject, Object mediaObject, int currentMediaIndex){
         if(Pref.pikoDebug()){
             AddReelButton.addDebugButton(context, helperObject, mediaObject, currentMediaIndex);
+        }
+        if(Pref.videoQualityPerPost() && AddReelButton.isVideoMedia(mediaObject, currentMediaIndex)){
+            AddReelButton.addVideoQualityButton(context, helperObject, mediaObject, currentMediaIndex);
         }
         if(Pref.enableDownload()){
             AddReelButton.addDownloadButton(context, helperObject, mediaObject, currentMediaIndex);

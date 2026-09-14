@@ -683,6 +683,13 @@ public class ScreenBuilder {
                             Settings.VIDEO_QUALITY_MODE
                     )
             );
+            addPreference(
+                    helper.switchPreference(
+                            str("piko_video_quality_per_post"),
+                            str("piko_video_quality_per_post_desc"),
+                            Settings.VIDEO_QUALITY_PER_POST
+                    )
+            );
         }
 
         if (SettingsStatus.hideReshareButton) {

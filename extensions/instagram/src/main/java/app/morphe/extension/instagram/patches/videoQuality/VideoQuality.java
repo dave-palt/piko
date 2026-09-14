@@ -31,6 +31,7 @@ public final class VideoQuality {
     private static java.lang.reflect.Field dtoListField;
     private static java.lang.reflect.Field widthField;
     private static java.lang.reflect.Field typeField;
+    private static java.lang.reflect.Field urlField;
 
     private static java.lang.reflect.Field field(
             java.lang.reflect.Field cached, Object instance, String name) {
@@ -43,6 +44,52 @@ public final class VideoQuality {
             // Unresolvable on this build — caller treats as absent data.
             return null;
         }
+    }
+
+    // Per-reel overrides keyed by variant URL set: the user picks a variant for a
+    // specific reel from its ⋮ menu; every future pick on a list containing that
+    // exact URL returns it. Bounded so a long session can't grow it unbounded.
+    private static final java.util.Map<String, String> urlOverrides =
+            java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<String, String>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(java.util.Map.Entry<String, String> eldest) {
+                    return size() > 64;
+                }
+            });
+
+    /** Records a per-reel pick: any future variant list containing [chosenUrl] returns it. */
+    public static void overrideFor(String chosenUrl) {
+        if (chosenUrl == null || chosenUrl.isEmpty()) return;
+        urlOverrides.put(chosenUrl, chosenUrl);
+        Logger.printInfo(() -> "videoQuality per-reel override set: " + shorten(chosenUrl));
+    }
+
+    /** Returns the overridden variant for this list (identity match on URL), or null. */
+    private static Object applyOverride(java.util.List<?> variants) {
+        if (urlOverrides.isEmpty()) return null;
+        for (Object v : variants) {
+            String url = urlOf(v);
+            if (url != null && urlOverrides.containsKey(url)) return v;
+        }
+        return null;
+    }
+
+    private static String urlOf(Object v) {
+        try {
+            java.lang.reflect.Field f = field(urlField, v, "A06");
+            if (f == null) return null;
+            urlField = f;
+            Object o = f.get(v);
+            return o instanceof String ? (String) o : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String shorten(String url) {
+        int q = url.indexOf('?');
+        String base = q > 0 ? url.substring(0, q) : url;
+        return base.length() > 80 ? base.substring(0, 80) + "…" : base;
     }
 
     /** Returns true when a non-default quality override is active. */
@@ -77,12 +124,20 @@ public final class VideoQuality {
      */
     public static Object pick(Object original, Object mediaDto) {
         try {
-            if (original == null || mediaDto == null || !enabled()) {
+            if (original == null || mediaDto == null) {
                 return original;
             }
 
             java.util.List<?> variants = variantListOf(mediaDto);
             if (variants == null || variants.isEmpty()) {
+                return original;
+            }
+
+            // Per-reel pick wins over both stock and the global mode.
+            Object override = applyOverride(variants);
+            if (override != null) return override;
+
+            if (!enabled()) {
                 return original;
             }
 
@@ -100,12 +155,20 @@ public final class VideoQuality {
      */
     public static Object pickFromList(Object original, Object list) {
         try {
-            if (original == null || list == null || !(list instanceof java.util.List) || !enabled()) {
+            if (original == null || list == null || !(list instanceof java.util.List)) {
                 return original;
             }
 
             java.util.List<?> variants = (java.util.List<?>) list;
             if (variants.isEmpty()) {
+                return original;
+            }
+
+            // Per-reel pick wins over both stock and the global mode.
+            Object override = applyOverride(variants);
+            if (override != null) return override;
+
+            if (!enabled()) {
                 return original;
             }
 
