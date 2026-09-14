@@ -44,12 +44,15 @@ internal object MediaOverlayPayloadGetterFingerprint : Fingerprint(
 
 /**
  * Spoiler shield hook B: the cover-config builder method (439: X/0740.A00). Identified by
- * shape — the only method app-wide with two adjacent gates of the form
- * `invoke-virtual Media;-><rotating>()Z / move-result / if-eqz` guarding the media path.
- * For a normal post both gates are false, so the builder never consults the media payload;
- * we OR our verdict into both gate results so matching media take the cover path.
+ * shape — returns the cover-config type (0DxY) AND opens with two adjacent gates of the
+ * form `invoke-virtual Media;-><rotating>()Z / move-result / if-eqz` guarding the media
+ * path. For a normal post both gates are false, so the builder never consults the media
+ * payload; we OR our verdict into both gate results so matching media take the cover path.
+ * (The return-type pin matters: other methods share the double-gate shape — one false
+ * positive (X/01gB, product tagging) shipped in the first attempt.)
  */
 internal object CoverBuilderEligibilityFingerprint : Fingerprint(
+    returnType = "LX/0DxY;",
     custom = { methodDef, _ ->
         val impl = methodDef.implementation
         if (impl == null) {
