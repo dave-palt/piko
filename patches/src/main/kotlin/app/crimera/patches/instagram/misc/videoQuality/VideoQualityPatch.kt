@@ -12,6 +12,7 @@ import app.crimera.patches.instagram.utils.enableSettings
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
+import app.morphe.patcher.extensions.InstructionExtensions.instructions
 import app.morphe.patcher.patch.bytecodePatch
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.Method
@@ -72,8 +73,8 @@ val videoQualityPatch =
                     val returnIndices =
                         instructions
                             .withIndex()
-                            .filter { it.value.opcode == Opcode.RETURN_OBJECT }
-                            .map { it.index }
+                            .filter { (i, ins) -> ins.opcode == Opcode.RETURN_OBJECT }
+                            .map { (i, _) -> i }
                             .sortedDescending()
 
                     for (index in returnIndices) {
