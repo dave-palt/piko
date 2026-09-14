@@ -9,9 +9,12 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -36,6 +39,10 @@ public final class SpoilerShield {
     private static volatile Method takenAtMethod;
     private static volatile boolean takenAtProbed;
     private static int callCount;
+
+    /** Per-Media verdict cache: A1F/A1Z gates and the payload getter all ask the same question. */
+    private static final Map<Object, Boolean> verdictCache =
+            Collections.synchronizedMap(new WeakHashMap<Object, Boolean>());
 
     private SpoilerShield() {
     }
@@ -67,6 +74,30 @@ public final class SpoilerShield {
         } catch (Throwable t) {
             Logger.printException(() -> "SpoilerShield getMediaOverlayPayload failed", t);
             return stockPayload;
+        }
+    }
+
+    /**
+     * Injection point B: the tree-eligibility gates inside the cover builder. The builder
+     * only consults the media payload when these return true; on a normal post they are
+     * false, so a fabricated payload alone never renders. Forcing true for medias our
+     * rules match makes the builder take the media path and consume the payload.
+     */
+    public static boolean forceCoverEligibility(boolean stock, Object media) {
+        try {
+            if (stock) return true;
+            if (media == null) return false;
+            if (!Pref.spoilerShield()) return false;
+
+            Boolean cached = verdictCache.get(media);
+            if (cached != null) return cached;
+
+            boolean verdict = matchReason(media) != null;
+            verdictCache.put(media, verdict);
+            return verdict;
+        } catch (Throwable t) {
+            Logger.printException(() -> "SpoilerShield forceCoverEligibility failed", t);
+            return stock;
         }
     }
 
