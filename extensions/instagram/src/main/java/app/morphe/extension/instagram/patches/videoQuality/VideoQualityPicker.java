@@ -18,13 +18,16 @@ import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.instagram.entity.InstagramDialogBox;
 import app.morphe.extension.instagram.entity.MediaData;
+import app.morphe.extension.instagram.entity.VideoData;
+import app.morphe.extension.instagram.patches.videoQuality.CodecCapabilities.CodecInfo;
 
 /**
  * Per-post/reel quality picker, opened from the ⋮ overflow menu. Lists the actual
- * playback variants of the CURRENT media (same resolution tags the download
- * variant dialog shows) plus "Default" to clear any override. Picking a variant
- * registers a per-reel URL override in VideoQuality and re-opens the media so the
- * player re-binds with the chosen URL.
+ * playback variants of the CURRENT media with device-aware badges:
+ *   720p · HEVC (hw)   ← hardware decode, cheap
+ *   720p · AV1 (sw!)   ← software decode, CPU burner
+ * plus a "Default" row and a ★ recommended row = smallest battery cost
+ * (hardware-decodable, then lowest resolution, then most efficient codec).
  */
 public final class VideoQualityPicker {
 
@@ -36,15 +39,32 @@ public final class VideoQualityPicker {
         try { return s.get(); } catch (Exception e) { return 0; }
     }
 
-    /** "720p · codec 102" (or "720x1280 · codec 102" for odd sizes), unique via #n. */
-    private static String variantLabel(
-            app.morphe.extension.instagram.entity.VideoData v, java.util.List<String> existing) {
+    private static final class Row {
+        final VideoData variant;
+        final String label;
+        final int height;
+        final CodecInfo codec;
+        final boolean recommended;
+
+        Row(VideoData variant, String label, int height, CodecInfo codec, boolean recommended) {
+            this.variant = variant;
+            this.label = label;
+            this.height = height;
+            this.codec = codec;
+            this.recommended = recommended;
+        }
+    }
+
+    /** "720p · HEVC (hw)" / "480p · AV1 (sw!)" — unique via #n. */
+    private static String rowLabel(VideoData v, CodecInfo codec, List<String> existing) {
         int h = safeInt(v::getHeight);
         int w = safeInt(v::getWidth);
-        String codec;
-        try { codec = v.getVariantTag().replaceAll("^.*-", ""); } catch (Exception e) { codec = "?"; }
         String size = (h == 720 || h == 1080 || h == 480 || h == 360 || h == 2160) ? h + "p" : h + "x" + w;
-        String base = size + " · codec " + codec;
+        String badge;
+        if (codec.decodable && codec.hardware) badge = "(hw)";
+        else if (codec.decodable) badge = "(sw!)";
+        else badge = "(unsupported)";
+        String base = size + " · " + codec.name + " " + badge;
         if (!existing.contains(base)) return base;
         int n = 2;
         while (existing.contains(base + "  #" + n)) n++;
@@ -61,54 +81,76 @@ public final class VideoQualityPicker {
                 return;
             }
 
-            List<app.morphe.extension.instagram.entity.VideoData> variants = current.getVideoVariants();
+            List<VideoData> variants = current.getVideoVariants();
             if (variants == null || variants.isEmpty()) {
                 Utils.showToastShort(str("piko_video_quality_no_variants"));
                 return;
             }
 
-            InstagramDialogBox dialog = new InstagramDialogBox(context);
-
-            // Human labels: "720p · codec 102", sorted best-first (largest height,
-            // then width). Same-res variants differ in codec/bitrate — bytes and
-            // sometimes decode path — so the codec stays visible; exact duplicates
-            // get a #n suffix so every row is distinguishable.
-            java.util.List<app.morphe.extension.instagram.entity.VideoData> sorted =
-                    new java.util.ArrayList<>(variants);
-            java.util.Collections.sort(sorted, (a, b) -> {
-                int ha = safeInt(() -> a.getHeight()), hb = safeInt(() -> b.getHeight());
-                if (hb != ha) return Integer.compare(hb, ha);
-                int wa = safeInt(() -> a.getWidth()), wb = safeInt(() -> b.getWidth());
-                return Integer.compare(wb, wa);
+            // Build rows, best-first by resolution (height then width).
+            java.util.List<Row> rows = new java.util.ArrayList<>();
+            for (VideoData v : variants) {
+                rows.add(new Row(v, null, safeInt(v::getHeight), null, false));
+            }
+            java.util.Collections.sort(rows, (a, b) -> {
+                if (b.height != a.height) return Integer.compare(b.height, a.height);
+                return Integer.compare(safeInt(() -> b.variant.getWidth()), safeInt(() -> a.variant.getWidth()));
             });
 
+            // Codec info per row.
+            for (int i = 0; i < rows.size(); i++) {
+                Row r = rows.get(i);
+                String url = null;
+                try { url = r.variant.getUrl(); } catch (Exception ignored) {}
+                int type = typeOf(r.variant);
+                CodecInfo info = CodecCapabilities.of(type, url);
+                Row withCodec = new Row(r.variant, null, r.height, info, false);
+                rows.set(i, withCodec);
+            }
+
+            // Recommended = hardware-decodable, lowest resolution, most efficient codec.
+            int best = -1;
+            for (int i = 0; i < rows.size(); i++) {
+                Row r = rows.get(i);
+                if (!r.codec.decodable || !r.codec.hardware) continue;
+                if (best == -1) { best = i; continue; }
+                Row b = rows.get(best);
+                if (r.height < b.height
+                        || (r.height == b.height && r.codec.efficiency < b.codec.efficiency)) {
+                    best = i;
+                }
+            }
+
+            // Labels (recommended gets ★).
+            java.util.List<String> seen = new java.util.ArrayList<>();
+            for (int i = 0; i < rows.size(); i++) {
+                Row r = rows.get(i);
+                String label = rowLabel(r.variant, r.codec, seen);
+                seen.add(label);
+                boolean rec = (i == best);
+                rows.set(i, new Row(r.variant, rec ? "★ " + label : label, r.height, r.codec, rec));
+            }
+
+            InstagramDialogBox dialog = new InstagramDialogBox(context);
             java.util.ArrayList<String> options = new java.util.ArrayList<>();
             options.add(str("piko_array_video_quality_default"));
-            java.util.List<String> labels = new java.util.ArrayList<>();
-            for (app.morphe.extension.instagram.entity.VideoData v : sorted) {
-                String label = variantLabel(v, labels);
-                labels.add(label);
-                options.add(label);
-            }
+            for (Row r : rows) options.add(r.label);
             CharSequence[] items = options.toArray(new CharSequence[0]);
 
-            final List<app.morphe.extension.instagram.entity.VideoData> finalVariants = sorted;
+            final List<Row> finalRows = rows;
 
             dialog.addDialogMenuItems(items, new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface d, int which) {
                     try {
                         if (which == 0) {
-                            // "Default" — clear is implicit: not choosing any override
-                            // leaves the global mode in charge. Show what applies now.
                             Utils.showToastShort(str("piko_video_quality_using_global"));
                             return;
                         }
-                        app.morphe.extension.instagram.entity.VideoData chosen = finalVariants.get(which - 1);
-                        VideoQuality.overrideFor(chosen.getUrl());
+                        Row chosen = finalRows.get(which - 1);
+                        VideoQuality.overrideFor(chosen.variant.getUrl());
                         Utils.showToastShort(str("piko_video_quality_applied"));
-                        // The player re-binds on next bind cycle; scrolling away and
-                        // back (or pausing/resuming) applies it. No restart needed.
+                        // Applies on next bind (scroll away/back or pause/resume).
                     } catch (Exception e) {
                         Logger.printException(() -> "VideoQualityPicker onClick failed", e);
                         Utils.showToastShort(e.getMessage());
@@ -125,6 +167,17 @@ public final class VideoQualityPicker {
         } catch (Exception e) {
             Logger.printException(() -> "VideoQualityPicker.show failed", e);
             Utils.showToastShort(e.getMessage());
+        }
+    }
+
+    /** codec type int from the variant tag ("1280x720-102" -> 102). */
+    private static int typeOf(VideoData v) {
+        try {
+            String tag = v.getVariantTag();
+            int dash = tag.lastIndexOf('-');
+            return dash >= 0 ? Integer.parseInt(tag.substring(dash + 1).trim()) : 0;
+        } catch (Exception e) {
+            return 0;
         }
     }
 }
