@@ -116,6 +116,11 @@ public final class SpoilerShield {
      */
     public static Object coverImage(Object stockImage, Object titleToken) {
         try {
+            if (stockImage == null && titleToken instanceof String
+                    && ((String) titleToken).startsWith("piko-spoiler:")) {
+                Logger.printInfo(() -> "SpoilerShield coverImage invoked, token=" + titleToken
+                        + " stashed=" + pendingCoverUrls.size());
+            }
             if (stockImage != null) return stockImage;
             if (!(titleToken instanceof String)) return null;
 
@@ -257,12 +262,20 @@ public final class SpoilerShield {
     /** The media's own square thumbnail URL — the image the binder blurs for the cover. */
     private static String thumbnailUrlOf(Object media) {
         try {
-            Object imageInfo = new MediaData(media).getImageVariants();
-            // ImageData list: prefer the smallest (first) variant's URL
-            if (imageInfo instanceof java.util.List && !((java.util.List<?>) imageInfo).isEmpty()) {
-                Object imageData = ((java.util.List<?>) imageInfo).get(0);
-                java.lang.reflect.Method m = imageData.getClass().getMethod("getUrl");
-                return (String) m.invoke(imageData);
+            final MediaData md = new MediaData(media);
+            // Photos: image variants (first = smallest). Videos: first video variant's
+            // poster/thumbnail URL. Either works — the binder blurs it client-side.
+            if (!md.isVideo()) {
+                Object variants = md.getImageVariants();
+                if (variants instanceof java.util.List && !((java.util.List<?>) variants).isEmpty()) {
+                    Object imageData = ((java.util.List<?>) variants).get(0);
+                    return (String) imageData.getClass().getMethod("getUrl").invoke(imageData);
+                }
+            }
+            Object videoVariants = md.getVideoVariants();
+            if (videoVariants instanceof java.util.List && !((java.util.List<?>) videoVariants).isEmpty()) {
+                Object videoData = ((java.util.List<?>) videoVariants).get(0);
+                return (String) videoData.getClass().getMethod("getUrl").invoke(videoData);
             }
         } catch (Throwable t) {
             Logger.printException(() -> "SpoilerShield thumbnailUrlOf failed", t);
