@@ -137,6 +137,47 @@ public final class SpoilerShield {
         }
     }
 
+    /**
+     * Injection point D: the feed row controller's cover-path entry gates. The
+     * controller skips the whole cover block for normal posts (both flags false —
+     * stock only covers server-flagged restricted media). We OR our verdict in,
+     * keyed by the row object: its Media-typed field(s) carry the media identity.
+     */
+    public static boolean forceRowFlag(boolean stock, Object row) {
+        try {
+            if (stock) return true;
+            if (row == null) return false;
+            if (!Pref.spoilerShield()) return false;
+
+            // The row object exposes the Media via Media-typed fields (439: 01As.A0A
+            // carousel media + A0B main media). Probe every field whose type is
+            // com.instagram.feed.media.Media by NAME (no stub class available);
+            // a verdict on any of them opens the cover path.
+            Class<?> c = row.getClass();
+            while (c != null && c != Object.class) {
+                for (java.lang.reflect.Field f : c.getDeclaredFields()) {
+                    if (!f.getType().getName().equals("com.instagram.feed.media.Media")) {
+                        continue;
+                    }
+                    f.setAccessible(true);
+                    Object media = f.get(row);
+                    if (media == null) continue;
+                    Boolean cached = verdictCache.get(media);
+                    if (cached == null) {
+                        cached = matchReason(media) != null;
+                        verdictCache.put(media, cached);
+                    }
+                    if (cached) return true;
+                }
+                c = c.getSuperclass();
+            }
+            return false;
+        } catch (Throwable t) {
+            Logger.printException(() -> "SpoilerShield forceRowFlag failed", t);
+            return stock;
+        }
+    }
+
     // ---------------------------------------------------------------- rules
 
     /**
