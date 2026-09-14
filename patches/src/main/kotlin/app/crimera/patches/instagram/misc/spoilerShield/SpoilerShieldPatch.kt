@@ -15,8 +15,10 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.instructions
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.util.getReference
 import app.morphe.util.registersUsed
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
 /**
  * Spoiler shield hook: the media-overlay payload getter on com.instagram.feed.media.Media
@@ -39,6 +41,42 @@ internal object MediaOverlayPayloadGetterFingerprint : Fingerprint(
             methodDef.returnType == "Lcom/instagram/api/schemas/MediaOverlayPayloadSchemaIntf;"
     },
 )
+
+/**
+ * Spoiler shield hook B: the cover-config builder method (439: X/0740.A00). Identified by
+ * shape — the only method app-wide with two adjacent gates of the form
+ * `invoke-virtual Media;-><rotating>()Z / move-result / if-eqz` guarding the media path.
+ * For a normal post both gates are false, so the builder never consults the media payload;
+ * we OR our verdict into both gate results so matching media take the cover path.
+ */
+internal object CoverBuilderEligibilityFingerprint : Fingerprint(
+    custom = { methodDef, _ ->
+        val impl = methodDef.implementation
+        if (impl == null) {
+            false
+        } else {
+            val insns = impl.instructions.toList()
+            var found = false
+            var i = 0
+            while (!found && i + 5 < insns.size) {
+                found = isMediaBooleanGate(insns, i) && isMediaBooleanGate(insns, i + 3)
+                i++
+            }
+            found
+        }
+    },
+)
+
+private fun isMediaBooleanGate(insns: List<com.android.tools.smali.dexlib2.iface.instruction.Instruction>, i: Int): Boolean {
+    val invoke = insns[i] as? com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction ?: return false
+    val ref = invoke.reference as? com.android.tools.smali.dexlib2.iface.reference.MethodReference ?: return false
+    if (invoke.opcode != Opcode.INVOKE_VIRTUAL) return false
+    if (ref.definingClass != "Lcom/instagram/feed/media/Media;") return false
+    if (ref.parameterTypes.isNotEmpty() || ref.returnType != "Z") return false
+    if (insns[i + 1].opcode != Opcode.MOVE_RESULT) return false
+    if (insns[i + 2].opcode != Opcode.IF_EQZ) return false
+    return true
+}
 
 @Suppress("unused")
 val spoilerShieldPatch =
@@ -73,6 +111,43 @@ val spoilerShieldPatch =
                     move-result-object v$payloadReg
                     """.trimIndent(),
                 )
+            }
+
+            // Hook B: force the two eligibility gates inside the cover builder so matching
+            // media take the media-payload path (where hook A supplies the cover payload).
+            // Inserted right after each gate's move-result: OR in our verdict. OFF path
+            // ORs in 0 = stock behavior. The Media object is the gate invoke's base reg.
+            CoverBuilderEligibilityFingerprint.method.apply {
+                val gateSites =
+                    instructions.withIndex()
+                        .filter { (index, insn) ->
+                            val isGateInvoke =
+                                insn.opcode == Opcode.INVOKE_VIRTUAL &&
+                                    insn.getReference<MethodReference>()?.let { ref ->
+                                        ref.definingClass == "Lcom/instagram/feed/media/Media;" &&
+                                            ref.parameterTypes.isEmpty() &&
+                                            ref.returnType == "Z"
+                                    } == true
+                            val hasNextMoveResult =
+                                instructions.getOrNull(index + 1)?.opcode == Opcode.MOVE_RESULT
+                            isGateInvoke && hasNextMoveResult
+                        }
+                        .map { (index, insn) -> index to insn.registersUsed.first() }
+                require(gateSites.size >= 2) {
+                    "spoiler shield: expected >=2 eligibility gates in cover builder, found ${gateSites.size}"
+                }
+
+                gateSites.sortedByDescending { it.first }.forEach { (invokeIndex, baseReg) ->
+                    val moveResultIndex = invokeIndex + 1
+                    val resultReg = getInstruction(moveResultIndex).registersUsed[0]
+                    addInstructions(
+                        moveResultIndex + 1,
+                        """
+                        invoke-static {v$resultReg, v$baseReg}, $PATCHES_DESCRIPTOR/spoiler/SpoilerShield;->forceCoverEligibility(ZLjava/lang/Object;)Z
+                        move-result v$resultReg
+                        """.trimIndent(),
+                    )
+                }
             }
 
             enableSettings("spoilerShield")
