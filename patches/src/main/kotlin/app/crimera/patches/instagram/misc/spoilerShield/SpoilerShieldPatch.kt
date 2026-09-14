@@ -78,9 +78,10 @@ internal object CoverBuilderEligibilityFingerprint : Fingerprint(
  * Spoiler shield hook D: the classic feed row controller's bind method (439: X/01Rd.A07).
  * The controller gates the whole cover block behind two boolean flags (its own A0B and
  * the row-state's A0d), both false for normal posts — the cover builder (and hooks B/C
- * inside it) never runs. Identified by shape: a method that invokes the cover builder
- * (LX/0740;->A00) AND contains the two boolean iget + if-eqz gates over a shared
- * object register in whose class two Media-typed fields exist.
+ * inside it) never runs. Identified by shape: invokes the cover builder
+ * (LX/0740;->A00, either invoke opcode) AND has 2-3 boolean iget+if-eqz gates in the
+ * GATE_WINDOW instructions right before that invoke. The 2-instruction gap between the
+ * two gates is stock (439); other builder callers (0GeQ, 09r2, 06EY...) lack these.
  */
 internal object FeedRowCoverGateFingerprint : Fingerprint(
     custom = { methodDef, _ ->
@@ -88,12 +89,29 @@ internal object FeedRowCoverGateFingerprint : Fingerprint(
         if (impl == null) {
             false
         } else {
-            impl.instructions.any {
+            val insns = impl.instructions.toList()
+            val builderInvokeIndex = insns.indexOfFirst {
                 (it.opcode == Opcode.INVOKE_VIRTUAL ||
                     it.opcode == Opcode.INVOKE_VIRTUAL_RANGE) &&
                     (it as? ReferenceInstruction)?.reference.let { r ->
                         (r as? MethodReference)?.definingClass == "LX/0740;" && r.name == "A00"
                     } == true
+            }
+            if (builderInvokeIndex < 0) {
+                false
+            } else {
+                val gateCount =
+                    insns.withIndex()
+                        .count { (index, insn) ->
+                            index < builderInvokeIndex &&
+                                builderInvokeIndex - index <= GATE_WINDOW &&
+                                insn.opcode == Opcode.IGET_BOOLEAN &&
+                                (insn as? ReferenceInstruction)?.reference.let { r ->
+                                    (r as? FieldReference)?.type == "Z"
+                                } == true &&
+                                insns.getOrNull(index + 1)?.opcode == Opcode.IF_EQZ
+                        }
+                gateCount in 2..3
             }
         }
     },
