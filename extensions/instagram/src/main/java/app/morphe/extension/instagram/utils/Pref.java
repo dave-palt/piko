@@ -331,6 +331,26 @@ public class Pref {
         return SharedPref.getBooleanPref(Settings.SHOW_POST_TIMESTAMP) && SettingsStatus.showPostTimestamp;
     }
 
+    public static boolean spoilerShield() {
+        return SharedPref.getBooleanPref(Settings.SPOILER_SHIELD) && SettingsStatus.spoilerShield;
+    }
+
+    public static String spoilerShieldMaxAgeHours() {
+        return SharedPref.getStringPref(Settings.SPOILER_SHIELD_MAX_AGE_HOURS);
+    }
+
+    public static String spoilerShieldUsernames() {
+        return SharedPref.getStringPref(Settings.SPOILER_SHIELD_USERNAMES);
+    }
+
+    public static String spoilerShieldHashtags() {
+        return SharedPref.getStringPref(Settings.SPOILER_SHIELD_HASHTAGS);
+    }
+
+    public static String spoilerShieldWords() {
+        return SharedPref.getStringPref(Settings.SPOILER_SHIELD_WORDS);
+    }
+
     public static String externalDownloaderPackageName() {
         return SharedPref.getStringPref(Settings.EXTERNAL_DOWNLOADER_PACKAGE_NAME);
     }
