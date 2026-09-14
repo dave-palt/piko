@@ -88,9 +88,9 @@ internal object FeedRowCoverGateFingerprint : Fingerprint(
         if (impl == null) {
             false
         } else {
-            val insns = impl.instructions.toList()
-            insns.any {
-                it.opcode == Opcode.INVOKE_VIRTUAL &&
+            impl.instructions.any {
+                (it.opcode == Opcode.INVOKE_VIRTUAL ||
+                    it.opcode == Opcode.INVOKE_VIRTUAL_RANGE) &&
                     (it as? ReferenceInstruction)?.reference.let { r ->
                         (r as? MethodReference)?.definingClass == "LX/0740;" && r.name == "A00"
                     } == true
@@ -233,7 +233,8 @@ val spoilerShieldPatch =
             FeedRowCoverGateFingerprint.method.apply {
                 val builderInvokeIndex =
                     instructions.indexOfFirst {
-                        it.opcode == Opcode.INVOKE_VIRTUAL &&
+                        (it.opcode == Opcode.INVOKE_VIRTUAL ||
+                            it.opcode == Opcode.INVOKE_VIRTUAL_RANGE) &&
                             it.getReference<MethodReference>()?.let { ref ->
                                 ref.definingClass == "LX/0740;" && ref.name == "A00"
                             } == true
