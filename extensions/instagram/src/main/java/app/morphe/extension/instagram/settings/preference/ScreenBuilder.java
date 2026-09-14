@@ -675,6 +675,16 @@ public class ScreenBuilder {
             );
         }
 
+        if (SettingsStatus.videoQuality) {
+            addPreference(
+                    helper.listPreference(
+                            str("piko_video_quality"),
+                            str("piko_video_quality_desc"),
+                            Settings.VIDEO_QUALITY_MODE
+                    )
+            );
+        }
+
         if (SettingsStatus.hideReshareButton) {
             addPreference(
                     helper.switchPreference(

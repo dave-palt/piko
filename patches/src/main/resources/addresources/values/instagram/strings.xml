@@ -115,6 +115,13 @@
     <string name="piko_customise_story_timestamp_desc">Customise the timestamp that shows when the story was posted</string>
     <string name="piko_improve_image_viewing">Improve image viewing</string>
     <string name="piko_improve_image_viewing_desc">Fetches max resolution images from server. May reduce performance, increase app data size, or cause the app to switch to an older layout</string>
+    <string name="piko_video_quality">Video playback quality</string>
+    <string name="piko_video_quality_desc">Preferred in-app video playback resolution. Default keeps Instagram's automatic choice; lower values save data and CPU.</string>
+    <string name="piko_array_video_quality_default">Default (automatic)</string>
+    <string name="piko_array_video_quality_highest">Highest available</string>
+    <string name="piko_array_video_quality_720">Up to 720p</string>
+    <string name="piko_array_video_quality_480">Up to 480p</string>
+    <string name="piko_array_video_quality_360">Up to 360p</string>
     <string name="piko_hide_reshare_button">Hide reshare button</string>
     <string name="piko_copy_comment">Copy comment</string>
     <string name="piko_copy_comment_desc">Adds a button to copy comments on posts and reels</string>
