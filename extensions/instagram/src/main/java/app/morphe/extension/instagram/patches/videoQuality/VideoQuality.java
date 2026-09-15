@@ -106,31 +106,18 @@ public final class VideoQuality {
         return best;
     }
 
-    // URLs the hook actually handed the player recently (any mode, stock included)
-    // — lets the ⋮ dialog mark which variant is CURRENTLY playing for this media.
-    private static final java.util.Set<String> recentChosen =
-            java.util.Collections.synchronizedSet(
-                    java.util.Collections.newSetFromMap(
-                            new java.util.LinkedHashMap<String, Boolean>(16, 0.75f, true) {
-                                @Override
-                                protected boolean removeEldestEntry(java.util.Map.Entry<String, Boolean> eldest) {
-                                    return size() > 64;
-                                }
-                            }));
+    // Only the single most-recent URL the hook handed the player — the marker must
+    // identify ONE row per dialog, not everything ever chosen this session.
+    private static volatile String lastChosenUrl;
 
     private static void rememberChosen(Object chosen) {
         String url = urlOf(chosen);
-        if (url != null) recentChosen.add(url);
-    }
-
-    /** True when this URL was explicitly picked per-reel by the user. */
-    public static boolean isOverridden(String url) {
-        return url != null && recentChosen.contains(url) && stickyHeight >= 0;
+        if (url != null) lastChosenUrl = url;
     }
 
     /** True when this URL is what the player most recently received. */
     public static boolean isCurrentlyUsed(String url) {
-        return url != null && recentChosen.contains(url);
+        return url != null && url.equals(lastChosenUrl);
     }
 
     private static String urlOf(Object v) {
