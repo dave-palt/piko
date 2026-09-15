@@ -241,7 +241,9 @@
 
     <string-array name="piko_array_video_quality">
         <item>@string/piko_array_video_quality_default</item>
+        <item>@string/piko_array_video_quality_best</item>
         <item>@string/piko_array_video_quality_highest</item>
+        <item>@string/piko_array_video_quality_lowest</item>
         <item>@string/piko_array_video_quality_720</item>
         <item>@string/piko_array_video_quality_480</item>
         <item>@string/piko_array_video_quality_360</item>
@@ -249,7 +251,9 @@
 
     <string-array name="piko_array_video_quality_val">
         <item>default</item>
+        <item>best</item>
         <item>highest</item>
+        <item>lowest</item>
         <item>720</item>
         <item>480</item>
         <item>360</item>

@@ -121,10 +121,13 @@
     <string name="piko_video_quality_per_post_desc">Adds a "Video quality" row to the post and reel ⋮ menu to pick the playback quality for that specific media</string>
     <string name="piko_video_quality_not_video">This media is not a video</string>
     <string name="piko_video_quality_no_variants">No video variants available</string>
-    <string name="piko_video_quality_applied">Quality applied on next load</string>
+    <string name="piko_video_quality_applied_next">Quality set for this and upcoming videos</string>
+    <string name="piko_video_quality_cleared">Back to the global quality setting</string>
     <string name="piko_video_quality_using_global">Using the global quality setting</string>
     <string name="piko_array_video_quality_default">Default (automatic)</string>
+    <string name="piko_array_video_quality_best">Best for device (dynamic)</string>
     <string name="piko_array_video_quality_highest">Highest available</string>
+    <string name="piko_array_video_quality_lowest">Lowest (data/CPU saver, dynamic)</string>
     <string name="piko_array_video_quality_720">Up to 720p</string>
     <string name="piko_array_video_quality_480">Up to 480p</string>
     <string name="piko_array_video_quality_360">Up to 360p</string>
