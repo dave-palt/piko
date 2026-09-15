@@ -94,8 +94,8 @@ public final class VideoQualityPicker {
             java.util.List<Row> rows = new java.util.ArrayList<>();
             java.util.Set<String> seenUrls = new java.util.HashSet<>();
             for (VideoData v : variants) {
-                String url = null;
-                try { url = v.getUrl(); } catch (Exception ignored) {}
+                final String url;
+                try { url = v.getUrl(); } catch (Exception e) { url = null; }
                 Logger.printInfo(() -> "videoQuality variant: h=" + safeInt(v::getHeight)
                         + " type=" + typeOf(v) + " url=" + (url == null ? "null" : url));
                 if (url != null && !seenUrls.add(url)) continue; // duplicate stream
