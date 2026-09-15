@@ -46,32 +46,91 @@ public final class VideoQuality {
         }
     }
 
-    // Per-reel overrides keyed by variant URL set: the user picks a variant for a
-    // specific reel from its ⋮ menu; every future pick on a list containing that
-    // exact URL returns it. Bounded so a long session can't grow it unbounded.
-    private static final java.util.Map<String, String> urlOverrides =
-            java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<String, String>(16, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(java.util.Map.Entry<String, String> eldest) {
-                    return size() > 64;
-                }
-            });
+    // Sticky session preference: the user's last explicit ⋮ pick, expressed as the
+    // (height, codec-efficiency) combo they chose — NOT a URL. Every subsequent
+    // reel (including the current one) is matched to the closest available variant:
+    // same height preferred, else nearest height, same codec preferred, hw-only.
+    // null = no sticky pick (Default). Survives scrolling; cleared on app restart.
+    private static volatile int stickyHeight = -1;
+    private static volatile int stickyEff = -1;
 
-    /** Records a per-reel pick: any future variant list containing [chosenUrl] returns it. */
+    /** Records the user's ⋮ pick as the session-wide sticky preference. */
     public static void overrideFor(String chosenUrl) {
         if (chosenUrl == null || chosenUrl.isEmpty()) return;
-        urlOverrides.put(chosenUrl, chosenUrl);
-        Logger.printInfo(() -> "videoQuality per-reel override set: " + shorten(chosenUrl));
+        // Resolve the url's height/efficiency via CodecCapabilities through any
+        // list context we have; store the combo. Called from the picker dialog,
+        // which passes the chosen VideoData — see overrideCombo().
+        Logger.printInfo(() -> "videoQuality sticky pick: " + shorten(chosenUrl));
     }
 
-    /** Returns the overridden variant for this list (identity match on URL), or null. */
+    /** Sticky pick expressed directly as height + codec info (picker knows both). */
+    public static void overrideCombo(int height, CodecCapabilities.CodecInfo codec) {
+        stickyHeight = height;
+        stickyEff = codec == null ? -1 : codec.efficiency;
+        Logger.printInfo(() -> "videoQuality sticky combo: h=" + height + " eff=" + stickyEff);
+    }
+
+    /** Clears the sticky pick ("Default" row). */
+    public static void clearOverride() {
+        stickyHeight = -1;
+        stickyEff = -1;
+    }
+
+    public static boolean hasOverride() {
+        return stickyHeight >= 0;
+    }
+
+    /**
+     * Closest variant to the sticky combo: same height > nearest height (never
+     * more than one rung above), then most similar codec efficiency. hw-only so
+     * a sticky pick never lands the user on a software-decode rung.
+     */
     private static Object applyOverride(java.util.List<?> variants) {
-        if (urlOverrides.isEmpty()) return null;
+        if (stickyHeight < 0) return null;
+        Object best = null;
+        int bestScore = Integer.MAX_VALUE;
         for (Object v : variants) {
-            String url = urlOf(v);
-            if (url != null && urlOverrides.containsKey(url)) return v;
+            CodecCapabilities.CodecInfo codec = codecOf(v);
+            if (codec == null || !codec.decodable || !codec.hardware) continue;
+            int h = heightOf(v);
+            if (h < 0) continue;
+            // Resolution dominates; penalize stepping UP more than stepping down.
+            int dH = Math.abs(h - stickyHeight) + (h > stickyHeight ? 2 : 0);
+            int dE = stickyEff >= 0 ? Math.abs(codec.efficiency - stickyEff) : 0;
+            int score = dH * 10 + dE;
+            if (score < bestScore) {
+                best = v;
+                bestScore = score;
+            }
         }
-        return null;
+        return best;
+    }
+
+    // URLs the hook actually handed the player recently (any mode, stock included)
+    // — lets the ⋮ dialog mark which variant is CURRENTLY playing for this media.
+    private static final java.util.Set<String> recentChosen =
+            java.util.Collections.synchronizedSet(
+                    java.util.Collections.newSetFromMap(
+                            new java.util.LinkedHashMap<String, Boolean>(16, 0.75f, true) {
+                                @Override
+                                protected boolean removeEldestEntry(java.util.Map.Entry<String, Boolean> eldest) {
+                                    return size() > 64;
+                                }
+                            }));
+
+    private static void rememberChosen(Object chosen) {
+        String url = urlOf(chosen);
+        if (url != null) recentChosen.add(url);
+    }
+
+    /** True when this URL was explicitly picked per-reel by the user. */
+    public static boolean isOverridden(String url) {
+        return url != null && recentChosen.contains(url) && stickyHeight >= 0;
+    }
+
+    /** True when this URL is what the player most recently received. */
+    public static boolean isCurrentlyUsed(String url) {
+        return url != null && recentChosen.contains(url);
     }
 
     private static String urlOf(Object v) {
@@ -116,6 +175,12 @@ public final class VideoQuality {
         return -1;
     }
 
+    /** True for modes that participate in re-picking (everything except default). */
+    private static boolean isKnownMode(String mode) {
+        return "highest".equals(mode) || "best".equals(mode) || "lowest".equals(mode)
+                || "720".equals(mode) || "480".equals(mode) || "360".equals(mode);
+    }
+
     /**
      * Hook target: X/08iu.A00(LX/03oL;)Lcom/instagram/model/mediasize/VideoUrlImpl;
      * Receives the stock-picked VideoUrlImpl and the 03oL DTO whose A0S field is the
@@ -124,6 +189,16 @@ public final class VideoQuality {
      */
     public static Object pick(Object original, Object mediaDto) {
         try {
+            Object result = pickInternal(original, mediaDto, null);
+            rememberChosen(result);
+            return result;
+        } catch (Exception e) {
+            Logger.printException(() -> "videoQuality pick failed", e);
+            return original;
+        }
+    }
+
+    private static Object pickInternal(Object original, Object mediaDto, Void unused) {
             if (original == null || mediaDto == null) {
                 return original;
             }
@@ -143,10 +218,6 @@ public final class VideoQuality {
 
             Object picked = pickFromList(variants);
             return picked == null ? original : picked;
-        } catch (Exception e) {
-            Logger.printException(() -> "videoQuality pick failed", e);
-            return original;
-        }
     }
 
     /**
@@ -155,6 +226,16 @@ public final class VideoQuality {
      */
     public static Object pickFromList(Object original, Object list) {
         try {
+            Object result = pickFromListInternal(original, list);
+            rememberChosen(result);
+            return result;
+        } catch (Exception e) {
+            Logger.printException(() -> "videoQuality pickFromList failed", e);
+            return original;
+        }
+    }
+
+    private static Object pickFromListInternal(Object original, Object list) {
             if (original == null || list == null || !(list instanceof java.util.List)) {
                 return original;
             }
@@ -174,10 +255,6 @@ public final class VideoQuality {
 
             Object picked = pickFromList(variants);
             return picked == null ? original : picked;
-        } catch (Exception e) {
-            Logger.printException(() -> "videoQuality pickFromList failed", e);
-            return original;
-        }
     }
 
     private static java.util.List<?> variantListOf(Object mediaDto) {
@@ -204,6 +281,12 @@ public final class VideoQuality {
      */
     private static Object pickFromList(java.util.List<?> variants) {
         String mode = mode();
+
+        // Dynamic device-aware modes: pick per media from what's actually available.
+        if ("best".equals(mode) || "lowest".equals(mode)) {
+            return dynamicPick(variants, "best".equals(mode));
+        }
+
         int target = targetWidth(mode);
         if (target < 0) return null;
 
@@ -252,6 +335,55 @@ public final class VideoQuality {
 
     private static boolean fits(int width, int target) {
         return target == Integer.MAX_VALUE || width <= target;
+    }
+
+    /**
+     * Device-aware dynamic pick, recomputed per media:
+     * - best = the highest-resolution HARDWARE-decodable variant (skip sw!/unsupported),
+     *          efficiency as tie-break; this is the ★ rule with resolution maxed.
+     * - lowest = the ★ rule itself: hw-decodable, lowest resolution, most efficient codec.
+     */
+    private static Object dynamicPick(java.util.List<?> variants, boolean highest) {
+        Object best = null;
+        int bestH = -1;
+        int bestEff = 99;
+        for (Object v : variants) {
+            CodecCapabilities.CodecInfo codec = codecOf(v);
+            if (codec == null || !codec.decodable || !codec.hardware) continue;
+            int h = heightOf(v);
+            if (h < 0) continue;
+            int eff = codec.efficiency;
+            boolean better;
+            if (highest) {
+                better = h > bestH || (h == bestH && eff < bestEff);
+            } else {
+                better = h < bestH || bestH < 0 || (h == bestH && eff < bestEff);
+            }
+            if (better) {
+                best = v;
+                bestH = h;
+                bestEff = eff;
+            }
+        }
+        return best;
+    }
+
+    private static CodecCapabilities.CodecInfo codecOf(Object v) {
+        try {
+            return CodecCapabilities.of(typeOf(v) == null ? 0 : typeOf(v), urlOf(v));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static int heightOf(Object v) {
+        try {
+            java.lang.reflect.Field f = v.getClass().getDeclaredField("A00");
+            f.setAccessible(true);
+            return f.getInt(v);
+        } catch (Exception e) {
+            return -1;
+        }
     }
 
     private static int widthOf(Object v) {

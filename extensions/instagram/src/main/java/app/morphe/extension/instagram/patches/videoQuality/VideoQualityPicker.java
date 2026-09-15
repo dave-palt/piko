@@ -121,19 +121,28 @@ public final class VideoQualityPicker {
                 }
             }
 
-            // Labels (recommended gets ★).
+            // Labels: ★ recommended, ● = currently playing for this media.
             java.util.List<String> seen = new java.util.ArrayList<>();
             for (int i = 0; i < rows.size(); i++) {
                 Row r = rows.get(i);
                 String label = rowLabel(r.variant, r.codec, seen);
                 seen.add(label);
                 boolean rec = (i == best);
-                rows.set(i, new Row(r.variant, rec ? "★ " + label : label, r.height, r.codec, rec));
+                String url = null;
+                try { url = r.variant.getUrl(); } catch (Exception ignored) {}
+                boolean now = VideoQuality.isCurrentlyUsed(url);
+                StringBuilder sb = new StringBuilder();
+                if (rec) sb.append("★ ");
+                sb.append(label);
+                if (now) sb.append("  ● playing");
+                rows.set(i, new Row(r.variant, sb.toString(), r.height, r.codec, rec));
             }
 
             InstagramDialogBox dialog = new InstagramDialogBox(context);
             java.util.ArrayList<String> options = new java.util.ArrayList<>();
-            options.add(str("piko_array_video_quality_default"));
+            String defaultRow = str("piko_array_video_quality_default");
+            if (VideoQuality.hasOverride()) defaultRow += "  ✓";
+            options.add(defaultRow);
             for (Row r : rows) options.add(r.label);
             CharSequence[] items = options.toArray(new CharSequence[0]);
 
@@ -144,13 +153,15 @@ public final class VideoQualityPicker {
                 public void onClick(DialogInterface d, int which) {
                     try {
                         if (which == 0) {
-                            Utils.showToastShort(str("piko_video_quality_using_global"));
+                            VideoQuality.clearOverride();
+                            Utils.showToastShort(str("piko_video_quality_cleared"));
                             return;
                         }
                         Row chosen = finalRows.get(which - 1);
-                        VideoQuality.overrideFor(chosen.variant.getUrl());
-                        Utils.showToastShort(str("piko_video_quality_applied"));
-                        // Applies on next bind (scroll away/back or pause/resume).
+                        VideoQuality.overrideCombo(chosen.height, chosen.codec);
+                        Utils.showToastShort(str("piko_video_quality_applied_next"));
+                        // Sticky for the session: this and following reels get the
+                        // closest variant to this combo on their next bind.
                     } catch (Exception e) {
                         Logger.printException(() -> "VideoQualityPicker onClick failed", e);
                         Utils.showToastShort(e.getMessage());
