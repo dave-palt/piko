@@ -109,7 +109,8 @@ public final class CodecCapabilities {
         Map<String, CodecInfo> result = new HashMap<>();
         String[] keys = {"avc", "hevc", "av1", "vp9"};
         try {
-            MediaCodecInfo[] infos = MediaCodecList.getCodecInfos();
+            MediaCodecList list = new MediaCodecList(MediaCodecList.REGULAR_CODECS);
+            MediaCodecInfo[] infos = list.getCodecInfos();
             for (String key : keys) {
                 String mime = mimeOf(key);
                 boolean decodable = false;
