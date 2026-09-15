@@ -88,8 +88,17 @@ public final class VideoQualityPicker {
             }
 
             // Build rows, best-first by resolution (height then width).
+            // IG sometimes lists the SAME stream several times under different type
+            // ids (identical URL) — collapse those into one row so the dialog never
+            // shows duplicates (which also made every row read "playing").
             java.util.List<Row> rows = new java.util.ArrayList<>();
+            java.util.Set<String> seenUrls = new java.util.HashSet<>();
             for (VideoData v : variants) {
+                String url = null;
+                try { url = v.getUrl(); } catch (Exception ignored) {}
+                Logger.printInfo(() -> "videoQuality variant: h=" + safeInt(v::getHeight)
+                        + " type=" + typeOf(v) + " url=" + (url == null ? "null" : url));
+                if (url != null && !seenUrls.add(url)) continue; // duplicate stream
                 rows.add(new Row(v, null, safeInt(v::getHeight), null, false));
             }
             java.util.Collections.sort(rows, (a, b) -> {
