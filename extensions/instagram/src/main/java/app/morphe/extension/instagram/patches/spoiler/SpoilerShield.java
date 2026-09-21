@@ -64,9 +64,12 @@ public final class SpoilerShield {
         try {
             callCount++;
             if (callCount == 1 || callCount % 25 == 0) {
+                StackTraceElement[] st = new Throwable().getStackTrace();
+                String caller = st.length > 1 ? st[1].toString() : "?";
                 Logger.printInfo(() -> "SpoilerShield call #" + callCount
                         + " stock=" + (stockPayload == null ? "null" : stockPayload.getClass().getSimpleName())
-                        + " media=" + (media == null ? "null" : media.getClass().getName()));
+                        + " media=" + (media == null ? "null" : media.getClass().getName())
+                        + " caller=" + caller);
             }
             if (stockPayload != null) return stockPayload;
             if (media == null) return null;
@@ -77,7 +80,10 @@ public final class SpoilerShield {
 
             Object payload = fabricatePayload(reason, thumbnailUrlOf(media));
             if (payload != null) {
-                Logger.printInfo(() -> "SpoilerShield covering media: " + reason);
+                StackTraceElement[] st = new Throwable().getStackTrace();
+                String caller = st.length > 1 ? st[1].toString() : "?";
+                Logger.printInfo(() -> "SpoilerShield covering media: " + reason
+                        + " caller=" + caller);
             }
             return payload;
         } catch (Throwable t) {
