@@ -53,6 +53,17 @@ public final class SpoilerShield {
     /** Shared counter for one-shot diagnostic entry logs across hooks B/C/D. */
     private static int diagCalls;
 
+    /** First stack frame outside Media.A0I (the hook's host) = the real consumer. */
+    private static String callerOf() {
+        for (StackTraceElement f : new Throwable().getStackTrace()) {
+            if (f.getClassName().endsWith("SpoilerShield")) continue;
+            if (f.getClassName().equals("com.instagram.feed.media.Media")
+                    && f.getMethodName().equals("A0I")) continue;
+            return f.toString();
+        }
+        return "?";
+    }
+
     private SpoilerShield() {
     }
 
@@ -64,8 +75,7 @@ public final class SpoilerShield {
         try {
             callCount++;
             if (callCount == 1 || callCount % 25 == 0) {
-                StackTraceElement[] st = new Throwable().getStackTrace();
-                String caller = st.length > 1 ? st[1].toString() : "?";
+                String caller = callerOf();
                 Logger.printInfo(() -> "SpoilerShield call #" + callCount
                         + " stock=" + (stockPayload == null ? "null" : stockPayload.getClass().getSimpleName())
                         + " media=" + (media == null ? "null" : media.getClass().getName())
@@ -80,8 +90,7 @@ public final class SpoilerShield {
 
             Object payload = fabricatePayload(reason, thumbnailUrlOf(media));
             if (payload != null) {
-                StackTraceElement[] st = new Throwable().getStackTrace();
-                String caller = st.length > 1 ? st[1].toString() : "?";
+                String caller = callerOf();
                 Logger.printInfo(() -> "SpoilerShield covering media: " + reason
                         + " caller=" + caller);
             }
