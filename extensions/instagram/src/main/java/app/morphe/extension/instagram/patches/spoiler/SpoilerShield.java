@@ -50,6 +50,9 @@ public final class SpoilerShield {
 
     private static long tokenSeq;
 
+    /** Shared counter for one-shot diagnostic entry logs across hooks B/C/D. */
+    private static int diagCalls;
+
     private SpoilerShield() {
     }
 
@@ -91,6 +94,10 @@ public final class SpoilerShield {
      */
     public static boolean forceCoverEligibility(boolean stock, Object media) {
         try {
+            if (diagCalls++ < 6 || diagCalls % 50 == 0) {
+                Logger.printInfo(() -> "SpoilerShield B entry stock=" + stock
+                        + " media=" + (media == null ? "null" : media.getClass().getSimpleName()));
+            }
             if (stock) return true;
             if (media == null) return false;
             if (!Pref.spoilerShield()) return false;
@@ -116,6 +123,13 @@ public final class SpoilerShield {
      */
     public static Object coverImage(Object stockImage, Object titleToken) {
         try {
+            if (diagCalls++ < 6 || diagCalls % 50 == 0) {
+                Logger.printInfo(() -> "SpoilerShield C entry stockNull=" + (stockImage == null)
+                        + " token=" + (titleToken instanceof String
+                                ? ((String) titleToken).substring(0,
+                                        Math.min(24, ((String) titleToken).length()))
+                                : "non-string"));
+            }
             if (stockImage == null && titleToken instanceof String
                     && ((String) titleToken).startsWith("piko-spoiler:")) {
                 Logger.printInfo(() -> "SpoilerShield coverImage invoked, token=" + titleToken
@@ -145,6 +159,10 @@ public final class SpoilerShield {
      */
     public static boolean forceRowFlag(boolean stock, Object row) {
         try {
+            if (diagCalls++ < 6 || diagCalls % 50 == 0) {
+                Logger.printInfo(() -> "SpoilerShield D entry stock=" + stock
+                        + " row=" + (row == null ? "null" : row.getClass().getName()));
+            }
             if (stock) return true;
             if (row == null) return false;
             if (!Pref.spoilerShield()) return false;
