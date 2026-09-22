@@ -128,6 +128,51 @@ private fun isMediaBooleanGate(insns: List<Instruction>, i: Int): Boolean {
     return true
 }
 
+/**
+ * Spoiler shield hook E: the LIVE Litho feed row builder (439: X/00q4.A0o, classes15 —
+ * the row that renders row_feed_profile_header). Its cover section is gated by the
+ * row-state flag 01As.A0d (stock false for normal posts) and then a mobileconfig
+ * selector 017x.A00 (true → server Bloks cover; false → local builder 0740.A00, where
+ * hooks B/C already live). We force the gate and steer the selector to the local arm
+ * for matching rows, so the fabricated payload drives the native blurred cover.
+ * Identified by shape: reads 01As;->A0d:Z AND invokes both 017x;->A00 and 0740;->A00.
+ */
+internal object LiveRowCoverGateFingerprint : Fingerprint(
+    // Litho section-builder shape (439: A0o(01iy)03Wk) — disambiguates from the
+    // classic view binder 01Rd.A07 which shares the triple-gate shape.
+    parameters = listOf("LX/01iy;"),
+    returnType = "LX/03Wk;",
+    custom = { methodDef, _ ->
+        val impl = methodDef.implementation
+        if (impl == null) {
+            false
+        } else {
+            val insns = impl.instructions.toList()
+            val readsRowFlag = insns.any {
+                it.opcode == Opcode.IGET_BOOLEAN &&
+                    (it as? ReferenceInstruction)?.reference.let { r ->
+                        (r as? FieldReference)?.name == "A0d" && r.definingClass == "LX/01As;"
+                    } == true
+            }
+            val invokesSelector = insns.any {
+                (it.opcode == Opcode.INVOKE_STATIC ||
+                    it.opcode == Opcode.INVOKE_STATIC_RANGE) &&
+                    (it as? ReferenceInstruction)?.reference.let { r ->
+                        (r as? MethodReference)?.definingClass == "LX/017x;" && r.name == "A00"
+                    } == true
+            }
+            val invokesCoverBuilder = insns.any {
+                (it.opcode == Opcode.INVOKE_VIRTUAL ||
+                    it.opcode == Opcode.INVOKE_VIRTUAL_RANGE) &&
+                    (it as? ReferenceInstruction)?.reference.let { r ->
+                        (r as? MethodReference)?.definingClass == "LX/0740;" && r.name == "A00"
+                    } == true
+            }
+            readsRowFlag && invokesSelector && invokesCoverBuilder
+        }
+    },
+)
+
 /** How many instructions before the builder invoke the row gates can sit (439: ~35). */
 private const val GATE_WINDOW = 60
 
@@ -294,6 +339,76 @@ val spoilerShieldPatch =
                         """.trimIndent(),
                     )
                 }
+            }
+
+            // Hook E: the LIVE Litho feed row builder. Two injections:
+            //   E1 — the 01As.A0d entry gate: OR our row verdict in (branch-skip idiom,
+            //        gate register only read).
+            //   E2 — the 017x.A00 selector: when our verdict says cover and stock selects
+            //        the server-Bloks arm, force the local-builder arm (we have no Bloks
+            //        tree; the local arm is where hooks B/C render the fabricated cover).
+            LiveRowCoverGateFingerprint.method.apply {
+                // E1: iget-boolean v0, v2, 01As;->A0d:Z / if-eqz v0, :cond_666
+                val gateIndex = instructions.indexOfFirst {
+                    it.opcode == Opcode.IGET_BOOLEAN &&
+                        it.getReference<FieldReference>()?.let { ref ->
+                            ref.name == "A0d" && ref.definingClass == "LX/01As;"
+                        } == true
+                }
+                require(gateIndex >= 0) { "spoiler shield: 01As.A0d gate not found in live row builder" }
+                val flagReg = getInstruction(gateIndex).registersUsed[0]
+                // gate object register v2 = row state (01As) — carries the Media fields
+                val rowReg = getInstruction(gateIndex).registersUsed[1]
+
+                addInstructions(
+                    gateIndex + 1,
+                    """
+                    invoke-static {v$flagReg, v$rowReg}, $PATCHES_DESCRIPTOR/spoiler/SpoilerShield;->forceRowFlag(ZLjava/lang/Object;)Z
+                    move-result v$flagReg
+                    """.trimIndent(),
+                )
+
+                // E2: invoke-static 017x.A00(session) / move-result v0 / if-eqz v0, :cond_6b3
+                // (if-eqz selector==false → local builder arm). When our verdict is true
+                // we need selector FALSE, i.e. force the if-eqz TAKEN path.
+                val selIndex = instructions.indexOfFirst {
+                    (it.opcode == Opcode.INVOKE_STATIC ||
+                        it.opcode == Opcode.INVOKE_STATIC_RANGE) &&
+                        it.getReference<MethodReference>()?.let { ref ->
+                            ref.definingClass == "LX/017x;" && ref.name == "A00"
+                        } == true
+                }
+                require(selIndex >= 0) { "spoiler shield: 017x.A00 selector not found in live row builder" }
+                val selResReg = getInstruction(selIndex + 1).registersUsed[0]
+                addInstructions(
+                    selIndex + 2,
+                    """
+                    invoke-static {v$selResReg, v$rowReg}, $PATCHES_DESCRIPTOR/spoiler/SpoilerShield;->steerSelector(ZLjava/lang/Object;)Z
+                    move-result v$selResReg
+                    """.trimIndent(),
+                )
+            }
+
+            // Hook F: rewrite the fabricated token into the reason text at the cover
+            // config's title iput (0DxY.A05 <- getTitle()).
+            CoverBuilderEligibilityFingerprint.method.apply {
+                val titlePutIndex = instructions.indexOfFirst {
+                    it.opcode == Opcode.IPUT_OBJECT &&
+                        it.getReference<FieldReference>()?.let { ref ->
+                            ref.definingClass == "LX/0DxY;" && ref.name == "A05"
+                        } == true
+                }
+                require(titlePutIndex >= 0) { "spoiler shield: A05 title iput not found in cover builder" }
+                val titleReg = getInstruction(titlePutIndex).registersUsed[0]
+
+                addInstructions(
+                    titlePutIndex,
+                    """
+                    invoke-static {v$titleReg}, $PATCHES_DESCRIPTOR/spoiler/SpoilerShield;->coverTitle(Ljava/lang/Object;)Ljava/lang/Object;
+                    move-result-object v$titleReg
+                    check-cast v$titleReg, Ljava/lang/String;
+                    """.trimIndent(),
+                )
             }
 
             enableSettings("spoilerShield")

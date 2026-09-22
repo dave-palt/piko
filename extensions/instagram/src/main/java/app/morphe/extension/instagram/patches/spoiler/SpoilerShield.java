@@ -48,21 +48,12 @@ public final class SpoilerShield {
     private static final Map<String, String> pendingCoverUrls =
             Collections.synchronizedMap(new java.util.HashMap<String, String>());
 
+    /** Fabricated-title token -> human-readable reason, consumed by the cover-title hook. */
+    private static final Map<String, String> pendingTitles =
+            Collections.synchronizedMap(new java.util.HashMap<String, String>());
+
     private static long tokenSeq;
 
-    /** Shared counter for one-shot diagnostic entry logs across hooks B/C/D. */
-    private static int diagCalls;
-
-    /** First stack frame outside Media.A0I (the hook's host) = the real consumer. */
-    private static String callerOf() {
-        for (StackTraceElement f : new Throwable().getStackTrace()) {
-            if (f.getClassName().endsWith("SpoilerShield")) continue;
-            if (f.getClassName().equals("com.instagram.feed.media.Media")
-                    && f.getMethodName().equals("A0I")) continue;
-            return f.toString();
-        }
-        return "?";
-    }
 
     private SpoilerShield() {
     }
@@ -75,11 +66,9 @@ public final class SpoilerShield {
         try {
             callCount++;
             if (callCount == 1 || callCount % 25 == 0) {
-                String caller = callerOf();
                 Logger.printInfo(() -> "SpoilerShield call #" + callCount
                         + " stock=" + (stockPayload == null ? "null" : stockPayload.getClass().getSimpleName())
-                        + " media=" + (media == null ? "null" : media.getClass().getName())
-                        + " caller=" + caller);
+                        + " media=" + (media == null ? "null" : media.getClass().getName()));
             }
             if (stockPayload != null) return stockPayload;
             if (media == null) return null;
@@ -90,9 +79,7 @@ public final class SpoilerShield {
 
             Object payload = fabricatePayload(reason, thumbnailUrlOf(media));
             if (payload != null) {
-                String caller = callerOf();
-                Logger.printInfo(() -> "SpoilerShield covering media: " + reason
-                        + " caller=" + caller);
+                Logger.printInfo(() -> "SpoilerShield covering media: " + reason);
             }
             return payload;
         } catch (Throwable t) {
@@ -109,10 +96,6 @@ public final class SpoilerShield {
      */
     public static boolean forceCoverEligibility(boolean stock, Object media) {
         try {
-            if (diagCalls++ < 6 || diagCalls % 50 == 0) {
-                Logger.printInfo(() -> "SpoilerShield B entry stock=" + stock
-                        + " media=" + (media == null ? "null" : media.getClass().getSimpleName()));
-            }
             if (stock) return true;
             if (media == null) return false;
             if (!Pref.spoilerShield()) return false;
@@ -138,13 +121,6 @@ public final class SpoilerShield {
      */
     public static Object coverImage(Object stockImage, Object titleToken) {
         try {
-            if (diagCalls++ < 6 || diagCalls % 50 == 0) {
-                Logger.printInfo(() -> "SpoilerShield C entry stockNull=" + (stockImage == null)
-                        + " token=" + (titleToken instanceof String
-                                ? ((String) titleToken).substring(0,
-                                        Math.min(24, ((String) titleToken).length()))
-                                : "non-string"));
-            }
             if (stockImage == null && titleToken instanceof String
                     && ((String) titleToken).startsWith("piko-spoiler:")) {
                 Logger.printInfo(() -> "SpoilerShield coverImage invoked, token=" + titleToken
@@ -174,11 +150,20 @@ public final class SpoilerShield {
      */
     public static boolean forceRowFlag(boolean stock, Object row) {
         try {
-            if (diagCalls++ < 6 || diagCalls % 50 == 0) {
-                Logger.printInfo(() -> "SpoilerShield D entry stock=" + stock
-                        + " row=" + (row == null ? "null" : row.getClass().getName()));
-            }
             if (stock) return true;
+            return rowMatches(row);
+        } catch (Throwable t) {
+            Logger.printException(() -> "SpoilerShield forceRowFlag failed", t);
+            return stock;
+        }
+    }
+
+    /**
+     * Injection point E2: same row verdict as {@link #forceRowFlag}, without the stock
+     * passthrough — used to steer the Litho row's cover-path selector.
+     */
+    public static boolean rowMatches(Object row) {
+        try {
             if (row == null) return false;
             if (!Pref.spoilerShield()) return false;
 
@@ -206,9 +191,41 @@ public final class SpoilerShield {
             }
             return false;
         } catch (Throwable t) {
-            Logger.printException(() -> "SpoilerShield forceRowFlag failed", t);
+            Logger.printException(() -> "SpoilerShield rowMatches failed", t);
+            return false;
+        }
+    }
+
+    /**
+     * Injection point E2: the Litho row's cover-path selector (true → server Bloks arm,
+     * false → local builder arm). We have no Bloks tree, so when our verdict says cover,
+     * force the local arm.
+     */
+    public static boolean steerSelector(boolean stock, Object row) {
+        try {
+            if (!rowMatches(row)) return stock;
+            return false;
+        } catch (Throwable t) {
+            Logger.printException(() -> "SpoilerShield steerSelector failed", t);
             return stock;
         }
+    }
+
+    /**
+     * Injection point F: rewrites the fabricated token into the human-readable spoiler
+     * reason just before the cover config stores its title. Keyed lookup (not remove):
+     * the payload getter can be consulted several times per media.
+     */
+    public static Object coverTitle(Object titleToken) {
+        try {
+            if (titleToken instanceof String) {
+                String pretty = pendingTitles.get(titleToken);
+                if (pretty != null) return pretty;
+            }
+        } catch (Throwable t) {
+            Logger.printException(() -> "SpoilerShield coverTitle failed", t);
+        }
+        return titleToken;
     }
 
     // ---------------------------------------------------------------- rules
@@ -446,6 +463,7 @@ public final class SpoilerShield {
             // Unique title token: the builder tail (hook C) matches it to swap in the
             // cover image, since the payload itself carries no image.
             final String token = "piko-spoiler:" + (tokenSeq++);
+            pendingTitles.put(token, reason);
             if (thumbnailUrl != null) {
                 pendingCoverUrls.put(token, thumbnailUrl);
             }
