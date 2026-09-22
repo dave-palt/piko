@@ -213,6 +213,28 @@ public final class SpoilerShield {
     }
 
     /**
+     * Injection point G: the feed caption model getter (439: MediaExtKt.A0I). The cover
+     * hides the media but the caption row below it still shows the spoiler text verbatim —
+     * return null for matching media so the row renders as caption-less (04xV.A01
+     * null-checks the model and builds the empty-caption state).
+     */
+    public static Object suppressCaption(Object captionModel, Object media) {
+        try {
+            if (captionModel == null) return null;
+            if (media == null || !Pref.spoilerShield()) return captionModel;
+            Boolean cached = verdictCache.get(media);
+            if (cached == null) {
+                cached = matchReason(media) != null;
+                verdictCache.put(media, cached);
+            }
+            return cached ? null : captionModel;
+        } catch (Throwable t) {
+            Logger.printException(() -> "SpoilerShield suppressCaption failed", t);
+            return captionModel;
+        }
+    }
+
+    /**
      * Injection point F: rewrites the fabricated token into the human-readable spoiler
      * reason just before the cover config stores its title. Keyed lookup (not remove):
      * the payload getter can be consulted several times per media.
@@ -351,28 +373,41 @@ public final class SpoilerShield {
         }
     }
 
-    /** The media's own square thumbnail URL — the image the binder blurs for the cover. */
+    /**
+     * The media's own image URL — the image the binder blurs for the cover. Image variants
+     * are used for videos too (they are the poster frames); a video variant URL is an
+     * .mp4 STREAM that IgProgressImageView cannot decode, which paints nothing and leaves
+     * the sharp media visible behind the cover text.
+     */
     private static String thumbnailUrlOf(Object media) {
         try {
             final MediaData md = new MediaData(media);
-            // Photos: image variants (first = smallest). Videos: first video variant's
-            // poster/thumbnail URL. Either works — the binder blurs it client-side.
-            if (!md.isVideo()) {
-                Object variants = md.getImageVariants();
-                if (variants instanceof java.util.List && !((java.util.List<?>) variants).isEmpty()) {
-                    Object imageData = ((java.util.List<?>) variants).get(0);
-                    return (String) imageData.getClass().getMethod("getUrl").invoke(imageData);
+            Object variants = md.getImageVariants();
+            if (variants instanceof java.util.List) {
+                for (Object imageData : (java.util.List<?>) variants) {
+                    String url = urlOf(imageData);
+                    if (url != null && !url.contains(".mp4")) return url;
                 }
             }
             Object videoVariants = md.getVideoVariants();
-            if (videoVariants instanceof java.util.List && !((java.util.List<?>) videoVariants).isEmpty()) {
-                Object videoData = ((java.util.List<?>) videoVariants).get(0);
-                return (String) videoData.getClass().getMethod("getUrl").invoke(videoData);
+            if (videoVariants instanceof java.util.List) {
+                for (Object videoData : (java.util.List<?>) videoVariants) {
+                    String url = urlOf(videoData);
+                    if (url != null) return url; // last resort
+                }
             }
         } catch (Throwable t) {
             Logger.printException(() -> "SpoilerShield thumbnailUrlOf failed", t);
         }
         return null;
+    }
+
+    private static String urlOf(Object variant) {
+        try {
+            return (String) variant.getClass().getMethod("getUrl").invoke(variant);
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     /**

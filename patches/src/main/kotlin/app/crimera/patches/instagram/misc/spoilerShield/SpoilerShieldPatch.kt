@@ -173,6 +173,24 @@ internal object LiveRowCoverGateFingerprint : Fingerprint(
     },
 )
 
+/**
+ * Spoiler shield hook G: the feed caption model getter (439: MediaExtKt.A0I,
+ * classes1). Static, takes Media, returns the caption model 02bL — unique shape
+ * app-wide. The media cover hides the image but the caption row below still shows
+ * the spoiler text; nulling the model for matching media renders the row caption-less
+ * (every consumer null-checks: 04xV.A01 `if-eqz p1`).
+ */
+internal object CaptionModelGetterFingerprint : Fingerprint(
+    // 439: A0I — MediaExtKt has TWO static (Media)02bL methods (A0H = preview model used
+    // elsewhere, A0I = caption model); pin the name per-version.
+    name = "A0I",
+    parameters = listOf("Lcom/instagram/feed/media/Media;"),
+    returnType = "LX/02bL;",
+    custom = { _, classDef ->
+        classDef.type == "Lcom/instagram/feed/media/MediaExtKt;"
+    },
+)
+
 /** How many instructions before the builder invoke the row gates can sit (439: ~35). */
 private const val GATE_WINDOW = 60
 
@@ -409,6 +427,31 @@ val spoilerShieldPatch =
                     check-cast v$titleReg, Ljava/lang/String;
                     """.trimIndent(),
                 )
+            }
+
+            // Hook G: suppress the caption model for matching media (the cover hides the
+            // media; without this the caption row still shows the spoiler text verbatim).
+            // Inject before EVERY return-object; each site reads the value straight out of
+            // its own return register (439: two sites, v1 and v4).
+            CaptionModelGetterFingerprint.method.apply {
+                val impl = implementation
+                requireNotNull(impl) { "spoiler shield: caption getter has no implementation" }
+                val paramReg = impl.registerCount - 1 // p0 = the Media
+                val retSites =
+                    instructions.withIndex()
+                        .filter { (_, insn) -> insn.opcode == Opcode.RETURN_OBJECT }
+                        .map { (index, insn) -> index to insn.registersUsed.first() }
+                require(retSites.isNotEmpty()) { "spoiler shield: no return-object in caption getter" }
+
+                retSites.sortedByDescending { it.first }.forEach { (retIndex, resReg) ->
+                    addInstructions(
+                        retIndex,
+                        """
+                        invoke-static {v$resReg, v$paramReg}, $PATCHES_DESCRIPTOR/spoiler/SpoilerShield;->suppressCaption(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+                        move-result-object v$resReg
+                        """.trimIndent(),
+                    )
+                }
             }
 
             enableSettings("spoilerShield")
