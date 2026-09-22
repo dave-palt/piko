@@ -155,7 +155,8 @@ internal object LiveRowCoverGateFingerprint : Fingerprint(
                     } == true
             }
             val invokesSelector = insns.any {
-                it.opcode == Opcode.INVOKE_STATIC &&
+                (it.opcode == Opcode.INVOKE_STATIC ||
+                    it.opcode == Opcode.INVOKE_STATIC_RANGE) &&
                     (it as? ReferenceInstruction)?.reference.let { r ->
                         (r as? MethodReference)?.definingClass == "LX/017x;" && r.name == "A00"
                     } == true
@@ -371,7 +372,8 @@ val spoilerShieldPatch =
                 // (if-eqz selector==false → local builder arm). When our verdict is true
                 // we need selector FALSE, i.e. force the if-eqz TAKEN path.
                 val selIndex = instructions.indexOfFirst {
-                    it.opcode == Opcode.INVOKE_STATIC &&
+                    (it.opcode == Opcode.INVOKE_STATIC ||
+                        it.opcode == Opcode.INVOKE_STATIC_RANGE) &&
                         it.getReference<MethodReference>()?.let { ref ->
                             ref.definingClass == "LX/017x;" && ref.name == "A00"
                         } == true
