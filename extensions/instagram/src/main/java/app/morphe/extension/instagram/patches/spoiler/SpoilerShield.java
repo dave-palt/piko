@@ -132,7 +132,8 @@ public final class SpoilerShield {
             String url = pendingCoverUrls.remove(titleToken);
             if (url == null) return null;
 
-            Logger.printInfo(() -> "SpoilerShield supplying cover image");
+            final String u = url;
+            Logger.printInfo(() -> "SpoilerShield supplying cover image: " + u);
             return Class.forName("com.instagram.common.typedurl.SimpleImageUrl")
                     .getConstructor(String.class)
                     .newInstance(url);
