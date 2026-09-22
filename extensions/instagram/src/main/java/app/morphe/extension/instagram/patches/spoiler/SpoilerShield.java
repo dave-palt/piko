@@ -468,7 +468,13 @@ public final class SpoilerShield {
                 pendingCoverUrls.put(token, thumbnailUrl);
             }
 
+            // args[N] maps to ctor param p(N+1). Field map (439):
+            // p11→A0A = BqK() — REQUIRED subtitle (0iaE throws when null);
+            // p12→A0B = Cmb() renderType (null ⇒ builder synthesizes blur URL);
+            // p13/p14→A0C/A0D = CEL()/Cuo() secondary text; p16→A0F = getTitle()
+            // — carries the token consumed by hook C (rewritten by hook F).
             final Object[] args = new Object[17];
+            args[10] = reason;         // BqK() required subtitle
             args[11] = null;           // renderType (Cmb)
             args[12] = reason;         // subtitle slot (DAF)
             args[13] = reason;
