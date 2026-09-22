@@ -181,12 +181,13 @@ internal object LiveRowCoverGateFingerprint : Fingerprint(
  * (every consumer null-checks: 04xV.A01 `if-eqz p1`).
  */
 internal object CaptionModelGetterFingerprint : Fingerprint(
+    // 439: A0I — MediaExtKt has TWO static (Media)02bL methods (A0H = preview model used
+    // elsewhere, A0I = caption model); pin the name per-version.
+    name = "A0I",
     parameters = listOf("Lcom/instagram/feed/media/Media;"),
     returnType = "LX/02bL;",
-    custom = { methodDef, classDef ->
-        classDef.type == "Lcom/instagram/feed/media/MediaExtKt;" &&
-            methodDef.parameterTypes.size == 1 &&
-            (methodDef.accessFlags.isStatic)
+    custom = { _, classDef ->
+        classDef.type == "Lcom/instagram/feed/media/MediaExtKt;"
     },
 )
 
@@ -433,7 +434,9 @@ val spoilerShieldPatch =
             // Inject before EVERY return-object; each site reads the value straight out of
             // its own return register (439: two sites, v1 and v4).
             CaptionModelGetterFingerprint.method.apply {
-                val paramReg = implementation.registerCount - 1 // p0 = the Media
+                val impl = implementation
+                requireNotNull(impl) { "spoiler shield: caption getter has no implementation" }
+                val paramReg = impl.registerCount - 1 // p0 = the Media
                 val retSites =
                     instructions.withIndex()
                         .filter { (_, insn) -> insn.opcode == Opcode.RETURN_OBJECT }
