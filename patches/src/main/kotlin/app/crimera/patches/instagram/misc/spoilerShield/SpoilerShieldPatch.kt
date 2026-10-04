@@ -220,6 +220,7 @@ val spoilerShieldPatch =
                     """
                     invoke-static {v$payloadReg, p0}, $PATCHES_DESCRIPTOR/spoiler/SpoilerShield;->getMediaOverlayPayload(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
                     move-result-object v$payloadReg
+                    check-cast v$payloadReg, Lcom/instagram/api/schemas/MediaOverlayPayloadSchemaIntf;
                     """.trimIndent(),
                 )
             }
@@ -449,6 +450,7 @@ val spoilerShieldPatch =
                         """
                         invoke-static {v$resReg, v$paramReg}, $PATCHES_DESCRIPTOR/spoiler/SpoilerShield;->suppressCaption(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
                         move-result-object v$resReg
+                        check-cast v$resReg, LX/02bL;
                         """.trimIndent(),
                     )
                 }
