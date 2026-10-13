@@ -23,6 +23,7 @@ import java.util.List;
 
 import app.morphe.extension.instagram.constants.UI;
 import app.morphe.extension.instagram.entity.MediaData;
+import app.morphe.extension.instagram.utils.Pref;
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.ui.Dim;
@@ -46,6 +47,14 @@ public class ShareSheetCopyLink {
     // null), retry a few times so galleries still get the dual-button layout.
     private static final int MAX_RESOLVE_RETRIES = 3;
     private static final long RESOLVE_RETRY_DELAY_MS = 800L;
+
+    /**
+     * Post id -> carousel slide on screen when the share sheet was opened.
+     * Written by the share-funnel hook (both the parent post id and the
+     * resolved child id map to the same index) and read at copy time.
+     */
+    private static final java.util.LinkedHashMap<String, Integer> LAST_SHARE_INDEX =
+            new java.util.LinkedHashMap<>();
 
     private static Object readField(Object instance, String name) {
         try {
@@ -233,6 +242,86 @@ public class ShareSheetCopyLink {
             Logger.printException(() -> "ShareSheetCopyLink getCarouselSize", e);
             return -1;
         }
+    }
+
+    /**
+     * Entry hook on Instagram's share funnel: called with the (parent) media
+     * and the carousel slide on screen at the moment the share sheet opens.
+     * Records the slide so "copy current media link" copies what the user is
+     * actually looking at, not always the first slide. Must never throw: a
+     * failure here would break the stock share flow.
+     */
+    public static void onShareRequested(Object mediaObject, int index) {
+        if (mediaObject == null || index < 0) {
+            return;
+        }
+        if (!Pref.copyMediaLink() && !Pref.shareSheetCopyLink()) {
+            return;
+        }
+        try {
+            MediaData mediaData = new MediaData(mediaObject, null);
+            String parentKey = mediaData.getPostID();
+            synchronized (LAST_SHARE_INDEX) {
+                LAST_SHARE_INDEX.put(parentKey, index);
+                // Instagram's funnel resolves the current child before the
+                // sheet opens; depending on surface, the sheet's own media is
+                // either that child or the parent - key both.
+                String childKey = mediaData.getMediaAt(index).getPostID();
+                if (childKey != null && !childKey.equals(parentKey)) {
+                    LAST_SHARE_INDEX.put(childKey, index);
+                }
+                if (LAST_SHARE_INDEX.size() > 64) {
+                    // cheap trim: drop oldest quarter
+                    int drop = LAST_SHARE_INDEX.size() / 4;
+                    java.util.Iterator<String> it = LAST_SHARE_INDEX.keySet().iterator();
+                    for (int i = 0; i < drop && it.hasNext(); i++) {
+                        it.remove();
+                    }
+                }
+            }
+            Logger.printInfo(() -> "ShareSheetCopyLink: share on slide " + index
+                    + " of post " + parentKey);
+        } catch (Throwable t) {
+            Logger.printException(() -> "ShareSheetCopyLink onShareRequested", t);
+        }
+    }
+
+    /**
+     * Which carousel slide should "copy current media link" use?
+     * 1. If the sheet's media IS a carousel child (its own id appears in the
+     *    list), that position is the slide the user was shown.
+     * 2. Otherwise fall back to the slide recorded by the share-funnel hook
+     *    (covers sheets holding the parent media).
+     * 3. Otherwise 0 (previous behavior).
+     */
+    private static int currentIndexOf(MediaData data) {
+        try {
+            int size = data.getCarouselSize();
+            if (size <= 1) {
+                return 0;
+            }
+            String ownKey = data.getPostID();
+            for (int i = 0; i < size; i++) {
+                String candidate = data.getMediaAt(i).getPostID();
+                if (candidate != null && candidate.equals(ownKey)) {
+                    return i;
+                }
+            }
+            Integer recorded;
+            synchronized (LAST_SHARE_INDEX) {
+                recorded = LAST_SHARE_INDEX.get(ownKey);
+            }
+            if (recorded != null && recorded >= 0 && recorded < size) {
+                final int viaTracker = recorded;
+                Logger.printInfo(() -> "ShareSheetCopyLink: current slide via share hook: "
+                        + viaTracker);
+                return recorded;
+            }
+        } catch (Exception e) {
+            Logger.printException(() -> "ShareSheetCopyLink currentIndexOf", e);
+        }
+        Logger.printInfo(() -> "ShareSheetCopyLink: current slide unresolved, using first");
+        return 0;
     }
 
     /**
@@ -441,7 +530,10 @@ public class ShareSheetCopyLink {
                 }
                 result = builder.toString();
             } else {
-                result = data.getMediaAt(0).getMediaLink();
+                final int currentSlide = currentIndexOf(data);
+                Logger.printInfo(() -> "ShareSheetCopyLink: copying current media link for slide "
+                        + currentSlide);
+                result = data.getMediaAt(currentSlide).getMediaLink();
             }
 
             if (result == null || result.isEmpty()) {
