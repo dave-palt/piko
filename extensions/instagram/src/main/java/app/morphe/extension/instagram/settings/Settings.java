@@ -23,7 +23,12 @@ public class Settings {
     public static final BooleanSetting OPEN_LINKS_EXTERNALLY = new BooleanSetting("open_links_externally", true);
     public static final BooleanSetting SANITIZE_SHARE_LINKS = new BooleanSetting("sanitize_share_links", true);
     // Debug-only: enables the dormant local share-link short-circuit (fork30 regression). Never ship enabled.
-    public static final BooleanSetting PIKO_DEBUG_KILL_SWITCH = new BooleanSetting("piko_debug_kill_switch", false);
+    // Key is versioned (_v2): the original piko_debug_kill_switch was a hidden
+    // pref set by hand in past debug sessions and PERSISTS across in-place
+    // updates — a stale true silently activated the dormant local-share-link
+    // path on daily-driver builds (random "Copied" toasts on Instagram's
+    // eager permalink prefetches). Re-keying resets every device to false.
+    public static final BooleanSetting PIKO_DEBUG_KILL_SWITCH = new BooleanSetting("piko_debug_kill_switch_v2", false);
     public static final StringSetting CUSTOM_SHARING_DOMAIN = new StringSetting("custom_sharing_domain", "");
     public static final BooleanSetting HIDE_SUGGESTED_CONTENT = new BooleanSetting("hide_suggested_content", true);
     public static final BooleanSetting DISABLE_META_AI = new BooleanSetting("disable_meta_ai", true);
