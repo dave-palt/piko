@@ -11,10 +11,8 @@ import java.util.concurrent.Callable;
 import app.morphe.extension.instagram.constants.PostType;
 import app.morphe.extension.instagram.entity.MediaData;
 import app.morphe.extension.instagram.settings.SettingsStatus;
-import app.morphe.extension.instagram.utils.IgStr;
 import app.morphe.extension.instagram.utils.Pref;
 import app.morphe.extension.shared.Logger;
-import app.morphe.extension.shared.Utils;
 
 /**
  * Serves share URLs locally instead of the third_party_sharing network
@@ -60,8 +58,13 @@ public final class LocalShareLink {
                 }
             }
             Object task = completedTask(link, "E11", "Dt3", "Pp9");
+            // No toast here: the permalink builder also fires on Instagram's
+            // eager prefetches while scrolling reels/carousels — a "Copied"
+            // toast on every build reads as a random toast. User-initiated
+            // copy flows toast on their own.
             if (task != null) {
-                Utils.showToastShort(IgStr.str("piko_copied"));
+                Logger.printInfo(() -> "LocalShareLink: served media permalink locally ("
+                        + postType + ", imgIndex=" + imgIndex + ")");
             }
             return task;
         } catch (Throwable t) {
