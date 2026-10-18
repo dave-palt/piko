@@ -12,6 +12,23 @@ import static app.morphe.extension.instagram.utils.IgStr.str;
 public class SettingsStatus {
     public static TreeMap<String,Boolean> FLAGS = new TreeMap();
 
+    static {
+        // The morphe-extensions-library defaults DEBUG_TOAST_ON_ERROR to
+        // TRUE: every caught exception in ANY patch renders a debug toast on
+        // the user's screen. On a daily driver that is pure noise (stack
+        // snippets appearing "randomly" during scroll). Exceptions keep going
+        // to logcat via Logger; only the on-screen toast is disabled. To
+        // re-enable for a debug session, set morphe_debug_toast_on_error back
+        // to true in the app prefs — this reset runs on every process start.
+        try {
+            app.morphe.extension.shared.settings.BaseSettings.DEBUG_TOAST_ON_ERROR
+                    .setValueFromString("false");
+            app.morphe.extension.shared.settings.BaseSettings.DEBUG_TOAST_ON_ERROR
+                    .saveToPreferences();
+        } catch (Throwable ignored) {
+        }
+    }
+
     // Developer section.
     public static boolean enableDeveloperOptions = false;
     public static void enableDeveloperOptions() {

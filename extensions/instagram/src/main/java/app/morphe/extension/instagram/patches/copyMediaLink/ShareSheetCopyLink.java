@@ -271,10 +271,15 @@ public class ShareSheetCopyLink {
                     LAST_SHARE_INDEX.put(childKey, index);
                 }
                 if (LAST_SHARE_INDEX.size() > 64) {
-                    // cheap trim: drop oldest quarter
+                    // cheap trim: drop oldest quarter. Iterator.remove() is
+                    // legal only after next() — calling remove() first throws
+                    // IllegalStateException (which, with the library's
+                    // DEBUG_TOAST_ON_ERROR debug flag on, surfaced as a toast
+                    // on every eager funnel call past the cap).
                     int drop = LAST_SHARE_INDEX.size() / 4;
                     java.util.Iterator<String> it = LAST_SHARE_INDEX.keySet().iterator();
                     for (int i = 0; i < drop && it.hasNext(); i++) {
+                        it.next();
                         it.remove();
                     }
                 }
