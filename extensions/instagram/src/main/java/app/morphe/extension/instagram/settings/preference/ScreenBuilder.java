@@ -690,6 +690,13 @@ public class ScreenBuilder {
                             Settings.VIDEO_QUALITY_PER_POST
                     )
             );
+            addPreference(
+                    helper.switchPreference(
+                            str("piko_sw_av1_decoding"),
+                            str("piko_sw_av1_decoding_desc"),
+                            Settings.SW_AV1_DECODING
+                    )
+            );
         }
 
         if (SettingsStatus.hideReshareButton) {

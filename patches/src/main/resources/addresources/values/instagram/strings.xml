@@ -124,6 +124,8 @@
     <string name="piko_video_quality_applied_next">Quality set for this and upcoming videos</string>
     <string name="piko_video_quality_cleared">Back to the global quality setting</string>
     <string name="piko_video_quality_using_global">Using the global quality setting</string>
+    <string name="piko_sw_av1_decoding">Software AV1 decoding</string>
+    <string name="piko_sw_av1_decoding_desc">Decode AV1 video (the new reels pipeline) with the software decoder. Fixes stuck scrubbing and frozen frames after seeking on phones whose hardware AV1 decoder mishandles Instagram's AV1 streams. Slightly higher battery use.</string>
     <string name="piko_array_video_quality_default">Default (automatic)</string>
     <string name="piko_array_video_quality_best">Best for device (dynamic)</string>
     <string name="piko_array_video_quality_highest">Highest available</string>
