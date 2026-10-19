@@ -343,6 +343,10 @@ public class Pref {
         return SharedPref.getBooleanPref(Settings.VIDEO_QUALITY_PER_POST) && SettingsStatus.videoQuality;
     }
 
+    public static boolean swAv1Decoding() {
+        return SharedPref.getBooleanPref(Settings.SW_AV1_DECODING) && SettingsStatus.videoQuality;
+    }
+
     public static String spoilerShieldMaxAgeHours() {
         return SharedPref.getStringPref(Settings.SPOILER_SHIELD_MAX_AGE_HOURS);
     }
