@@ -83,10 +83,16 @@ public final class Av1DecoderFilter {
         }
     }
 
-    /** AOSP software codec prefixes — everything else counts as vendor hardware. */
+    /**
+     * Software codec detection: AOSP prefixes, explicit .sw. markers, and the
+     * software AV1 decoder PROJECT NAMES (dav1d, gav1) — the latter catches
+     * IG's bundled "meta.dav1d.av1.decoder", which IS software despite the
+     * non-AOSP prefix (emulator-verified: it appears inside the selector list).
+     */
     private static boolean isSoftwareCodec(String name) {
         String n = name.toLowerCase(java.util.Locale.ROOT);
-        return n.startsWith("c2.android.") || n.startsWith("omx.google.") || n.contains(".sw.");
+        return n.startsWith("c2.android.") || n.startsWith("omx.google.")
+                || n.contains(".sw.") || n.contains("dav1d") || n.contains("gav1");
     }
 
     private static String namesOf(List<Object> infos) {
